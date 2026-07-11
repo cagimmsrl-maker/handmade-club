@@ -1,0 +1,70 @@
+# CLAUDE.md — App Clienti Handmade ("Handmade Club")
+
+## Cos'è questo progetto
+
+App web pubblica (PWA) per i clienti finali dei punti vendita Handmade Café (Car Food S.r.l.).
+Funzionalità Tappa 1: registrazione con telefono + OTP, tessera fedeltà digitale con QR code,
+livelli dinamici basati sulle visite, convenzioni aziendali, pannello admin, schermata scansione operatore.
+
+**Questo NON è il gestionale interno.** È un sistema separato: repository separato, database separato,
+processo PM2 separato, sottodominio separato. Non toccare mai il database o i file del gestionale ordini.
+
+## Stack
+
+- Frontend: React + Vite (PWA, installabile su home screen, mobile-first)
+- Backend: Node.js + Express
+- Database: PostgreSQL — database `handmade_clienti`, utente dedicato `hclub` (NON l'utente del gestionale)
+- Process manager: PM2, processo `handmade-club` su porta 3002
+- Reverse proxy: Nginx, sottodominio dedicato con HTTPS
+
+## Regole di produzione (NON derogabili)
+
+1. **Migrazioni numerate.** Ogni modifica allo schema passa da un file `migrations/NNN_descrizione.sql`
+   progressivo. Mai ALTER manuali fuori migrazione. Ogni migrazione registra sé stessa nella tabella
+   `schema_migrations`.
+2. **Sequenza di deploy:** git push → esecuzione migrazione SQL (se presente) → `npm run build` frontend →
+   `pm2 restart handmade-club`. Sempre in quest'ordine.
+3. **Niente dati fittizi in produzione.** Nessun seed di clienti di prova nel DB di produzione.
+   Per i test si usano numeri di telefono reali del titolare/staff.
+4. **Questo è un sistema pubblico esposto a Internet.** A differenza del gestionale (trust-based),
+   qui la sicurezza è rigorosa:
+   - Rate limiting su tutte le rotte pubbliche (login, richiesta OTP: max 5 richieste/15 min per IP e per numero)
+   - OTP a 6 cifre, validità 5 minuti, monouso, max 3 tentativi di verifica
+   - Sessioni con JWT httpOnly + secure, scadenza 30 giorni (i clienti non devono riloggarsi ogni volta)
+   - Input validation su ogni endpoint (mai fidarsi del client)
+   - Nessun dato sensibile nei log
+5. **Ruoli separati.** Tre superfici distinte:
+   - `/` → app cliente (pubblica, login OTP)
+   - `/operatore` → schermata scansione QR (login con PIN sede, pensata per tablet al banco)
+   - `/admin` → pannello amministrazione (login con password, solo titolare/manager)
+6. **QR token rotante.** Il QR del cliente è un token firmato (JWT breve) che ruota ogni 60 secondi,
+   per impedire l'uso di screenshot condivisi. La schermata cliente lo rigenera automaticamente.
+7. **GDPR by design.** Consensi tracciati con timestamp in colonne dedicate. Consenso marketing
+   SEPARATO e facoltativo. Endpoint di cancellazione account self-service (soft delete + anonimizzazione).
+8. **Lingua.** Tutta l'interfaccia utente in italiano.
+
+## Logica di dominio — Livelli e convenzioni
+
+- I **livelli** (es. Standard, Oro, Platinum) sono DINAMICI: si calcolano dal numero di scansioni
+  (visite) in una finestra mobile configurabile (default: ultimi 90 giorni). Le soglie e gli sconti
+  si configurano da `/admin`, non sono hardcoded.
+- Il ricalcolo del livello avviene a ogni scansione (non serve un cron per la Tappa 1).
+- Le **convenzioni** sono STATICHE: il cliente le attiva inserendo un codice convenzione nel profilo.
+  Sono una dimensione separata dai livelli.
+- Alla scansione, l'operatore vede: nome cliente, livello con sconto, eventuale convenzione con sconto.
+  In Tappa 1 lo sconto si applica in cassa manualmente; l'integrazione API TGS arriverà in una fase
+  successiva — strutturare il codice della scansione in modo che il punto di aggancio sia isolato
+  (un service `cassaService` oggi vuoto/log-only).
+
+## Integrazione TGS (futura, non in Tappa 1)
+
+TGS Retail ha confermato la disponibilità di API. Quando arriverà la documentazione:
+- l'integrazione vivrà in `server/services/tgs/`
+- nessuna chiamata TGS deve bloccare il flusso di scansione (fail-open: se TGS non risponde,
+  la scansione va comunque a buon fine e lo sconto si applica a mano)
+
+## Convenzioni di codice
+
+- Backend: struttura routes/ → controllers/ → services/ → db. Query parametrizzate sempre (pg, mai string interpolation).
+- Frontend: componenti funzionali, fetch centralizzato in `src/api.js` con gestione token.
+- Commit: messaggi in italiano, un commit per funzionalità completa.
