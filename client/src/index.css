@@ -1,0 +1,226 @@
+:root {
+  --colore-testo: #1f1f1f;
+  --colore-sfondo: #faf8f5;
+  --colore-superficie: #ffffff;
+  --colore-bordo: #e4ddd1;
+  --colore-primario: #2b2b2b;
+  --colore-primario-testo: #ffffff;
+  --colore-errore: #b3261e;
+  --colore-successo: #2e7d32;
+  --raggio: 14px;
+  --ombra: 0 2px 10px rgba(0, 0, 0, 0.06);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--colore-sfondo);
+  color: var(--colore-testo);
+}
+
+.schermo {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+}
+
+.schermo-larga {
+  max-width: 960px;
+}
+
+h1, h2, h3 {
+  margin: 0 0 12px;
+}
+
+p {
+  line-height: 1.5;
+}
+
+.card {
+  background: var(--colore-superficie);
+  border: 1px solid var(--colore-bordo);
+  border-radius: var(--raggio);
+  box-shadow: var(--ombra);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.campo label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.campo input, .campo select {
+  padding: 12px 14px;
+  font-size: 1rem;
+  border: 1px solid var(--colore-bordo);
+  border-radius: 10px;
+  background: var(--colore-superficie);
+  color: var(--colore-testo);
+}
+
+.campo input:focus, .campo select:focus {
+  outline: 2px solid var(--colore-primario);
+  outline-offset: 1px;
+}
+
+.campo-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.campo-checkbox input {
+  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 18px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-primario {
+  background: var(--colore-primario);
+  color: var(--colore-primario-testo);
+}
+
+.btn-primario:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondario {
+  background: transparent;
+  color: var(--colore-testo);
+  border: 1px solid var(--colore-bordo);
+}
+
+.btn-pericolo {
+  background: var(--colore-errore);
+  color: white;
+}
+
+.messaggio-errore {
+  color: var(--colore-errore);
+  font-size: 0.9rem;
+  margin: -6px 0 14px;
+}
+
+.messaggio-successo {
+  color: var(--colore-successo);
+  font-size: 0.9rem;
+}
+
+.testo-secondario {
+  color: #6b6b6b;
+  font-size: 0.9rem;
+}
+
+.link-testo {
+  background: none;
+  border: none;
+  color: var(--colore-testo);
+  text-decoration: underline;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+nav.tab-bar {
+  display: flex;
+  border-top: 1px solid var(--colore-bordo);
+  background: var(--colore-superficie);
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+}
+
+nav.tab-bar a, nav.tab-bar button {
+  flex: 1;
+  text-align: center;
+  padding: 14px 0;
+  text-decoration: none;
+  color: var(--colore-testo);
+  font-weight: 600;
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+nav.tab-bar a.attivo {
+  color: var(--colore-primario);
+  border-bottom: 3px solid var(--colore-primario);
+}
+
+table.tabella-admin {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+table.tabella-admin th, table.tabella-admin td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--colore-bordo);
+}
+
+.griglia-metriche {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.metrica {
+  background: var(--colore-superficie);
+  border: 1px solid var(--colore-bordo);
+  border-radius: var(--raggio);
+  padding: 16px;
+  text-align: center;
+}
+
+.metrica .valore {
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: white;
+}
