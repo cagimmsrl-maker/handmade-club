@@ -11,6 +11,9 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
+// Dietro Nginx: necessario perché il rate limiting per IP (req.ip) usi
+// X-Forwarded-For invece dell'IP del reverse proxy.
+app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
