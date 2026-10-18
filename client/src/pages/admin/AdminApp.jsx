@@ -8,10 +8,12 @@ import Convenzioni from './Convenzioni.jsx'
 import Sedi from './Sedi.jsx'
 import Parametri from './Parametri.jsx'
 import Clienti from './Clienti.jsx'
+import Promozioni from './Promozioni.jsx'
 
 const VOCI_MENU = [
   { percorso: '/admin', etichetta: 'Dashboard' },
   { percorso: '/admin/livelli', etichetta: 'Livelli' },
+  { percorso: '/admin/promozioni', etichetta: 'Promozioni' },
   { percorso: '/admin/convenzioni', etichetta: 'Convenzioni' },
   { percorso: '/admin/sedi', etichetta: 'Sedi' },
   { percorso: '/admin/parametri', etichetta: 'Parametri' },
@@ -70,6 +72,7 @@ export default function AdminApp() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/livelli" element={<Livelli />} />
+        <Route path="/promozioni" element={<Promozioni />} />
         <Route path="/convenzioni" element={<Convenzioni />} />
         <Route path="/sedi" element={<Sedi />} />
         <Route path="/parametri" element={<Parametri />} />

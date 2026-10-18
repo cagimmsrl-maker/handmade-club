@@ -5,8 +5,16 @@ const loginSchema = z.object({
   pin: z.string().trim().min(3).max(20),
 });
 
-const scansioneSchema = z.object({
-  qrToken: z.string().min(1),
+// Dal QR statico il campo è `codice`; `qrToken` resta per le app non aggiornate.
+const scansioneSchema = z
+  .object({
+    codice: z.string().trim().min(1).max(500).optional(),
+    qrToken: z.string().trim().min(1).max(500).optional(),
+  })
+  .refine((d) => d.codice || d.qrToken, { message: 'codice obbligatorio', path: ['codice'] });
+
+const usaPromozioneSchema = z.object({
+  codice: z.string().trim().min(1).max(500),
 });
 
-module.exports = { loginSchema, scansioneSchema };
+module.exports = { loginSchema, scansioneSchema, usaPromozioneSchema };

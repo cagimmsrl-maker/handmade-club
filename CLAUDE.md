@@ -54,8 +54,13 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
    - `/` → app cliente (pubblica, login OTP)
    - `/operatore` → schermata scansione QR (login con PIN sede, pensata per tablet al banco)
    - `/admin` → pannello amministrazione (login con password, solo titolare/manager)
-6. **QR token rotante.** Il QR del cliente è un token firmato (JWT breve) che ruota ogni 60 secondi,
-   per impedire l'uso di screenshot condivisi. La schermata cliente lo rigenera automaticamente.
+6. **QR statico (dal 18/10/2026, migrazione 003).** Il QR del cliente è `tessere.codice_qr`, un codice
+   casuale fisso (12 esadecimali), così le casse lo leggono come un codice a barre e si può stampare.
+   Ha sostituito il token JWT rotante: lo screenshot condiviso è un rischio accettato, mitigato dal
+   fatto che l'operatore vede nome e livello e che le promo sono legate all'account; con TGS sarà la
+   cassa a verificare. `GET /cliente/qr-token` e il campo `qrToken` della scansione restano solo per
+   compatibilità con le app già installate e vanno rimossi in una fase successiva. Il codice umano
+   `tessere.codice` (HC-000042) non va MAI usato come QR: è sequenziale e indovinabile.
 7. **GDPR by design.** Consensi tracciati con timestamp in colonne dedicate. Consenso marketing
    SEPARATO e facoltativo. Endpoint di cancellazione account self-service (soft delete + anonimizzazione).
 8. **Lingua.** Tutta l'interfaccia utente in italiano.
@@ -72,6 +77,25 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   In Tappa 1 lo sconto si applica in cassa manualmente; l'integrazione API TGS arriverà in una fase
   successiva — strutturare il codice della scansione in modo che il punto di aggancio sia isolato
   (un service `cassaService` oggi vuoto/log-only).
+
+## Logica di dominio — Promozioni "da caricare" (migrazione 003)
+
+- L'admin crea una promozione (`/admin/promozioni`): tipo `sconto_percentuale` | `prezzo_fisso` |
+  `omaggio` | `messaggio`, periodo dal/al, fascia oraria e giorni della settimana facoltativi
+  (0 = domenica come `Date.getDay()`), destinatari facoltativi (livello, sede), usi per cliente
+  (NULL = illimitati). Stati: `bozza` → `pubblicata` → `archiviata`. Si elimina solo una bozza mai
+  pubblicata; il resto si archivia per non perdere caricamenti e utilizzi.
+- Il cliente vede in bacheca (`/promozioni`) le promo pubblicate non scadute destinate a lui e le
+  **carica** (`promozioni_clienti`). Una promo non caricata per quel cliente NON vale: è il punto
+  della funzione (creare interazione), non un limite da aggirare.
+- Alla scansione l'operatore riceve solo le promo caricate, valide in quell'istante e in quella sede,
+  con usi residui (`promozioniService.caricateUtilizzabili`); applica lo sconto in cassa e preme
+  "Applicata" (`POST /operatore/promozioni/:id/usa`), che scrive `promozioni_utilizzi`. Il server
+  ricontrolla tutto: mai fidarsi di ciò che l'operatore ha a schermo.
+- La regola di validità è UNA sola (`promozioniService.validaOra`) e usa l'ora locale del server
+  (quella dei locali). Non duplicarla nel frontend: il client mostra, il server decide.
+- Le notifiche push per avvisare i clienti delle promo arrivano in una fase successiva (richiedono
+  HTTPS su dominio pubblico).
 
 ## Integrazione TGS (futura, non in Tappa 1)
 

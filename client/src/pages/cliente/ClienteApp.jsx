@@ -4,6 +4,7 @@ import { api } from '../../api.js'
 import Onboarding from './Onboarding.jsx'
 import Home from './Home.jsx'
 import Profilo from './Profilo.jsx'
+import Promozioni from './Promozioni.jsx'
 
 export default function ClienteApp() {
   const [stato, setStato] = useState('caricamento') // caricamento | onboarding | autenticato
@@ -31,6 +32,7 @@ export default function ClienteApp() {
     <>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/promozioni" element={<Promozioni />} />
         <Route
           path="/profilo"
           element={<Profilo onAccountCancellato={() => { setStato('onboarding'); navigate('/') }} />}
@@ -38,6 +40,7 @@ export default function ClienteApp() {
       </Routes>
       <nav className="tab-bar">
         <Link to="/" className={location.pathname === '/' ? 'attivo' : ''}>Tessera</Link>
+        <Link to="/promozioni" className={location.pathname === '/promozioni' ? 'attivo' : ''}>Promo</Link>
         <Link to="/profilo" className={location.pathname === '/profilo' ? 'attivo' : ''}>Profilo</Link>
       </nav>
     </>

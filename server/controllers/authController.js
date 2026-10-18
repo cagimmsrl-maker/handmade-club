@@ -1,6 +1,7 @@
 const pool = require('../db/pool');
 const otpService = require('../services/otpService');
 const jwtService = require('../services/jwtService');
+const promozioniService = require('../services/promozioniService');
 const { opzioniCookie } = require('../services/cookieOptions');
 
 function normalizzaTelefono(telefono) {
@@ -82,8 +83,8 @@ async function completaProfilo(req, res, next) {
 
     const codiceTessera = `HC-${String(cliente.id).padStart(6, '0')}`;
     await client.query(
-      `INSERT INTO tessere (cliente_id, codice) VALUES ($1, $2)`,
-      [cliente.id, codiceTessera]
+      `INSERT INTO tessere (cliente_id, codice, codice_qr) VALUES ($1, $2, $3)`,
+      [cliente.id, codiceTessera, promozioniService.generaCodiceQr()]
     );
 
     await client.query('COMMIT');

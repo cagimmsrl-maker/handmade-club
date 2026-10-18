@@ -2,6 +2,7 @@ const pool = require('../db/pool');
 const jwtService = require('../services/jwtService');
 const livelloService = require('../services/livelloService');
 const cassaService = require('../services/cassaService');
+const promozioniService = require('../services/promozioniService');
 const { opzioniCookie } = require('../services/cookieOptions');
 
 async function elencoSedi(req, res, next) {
@@ -45,25 +46,33 @@ async function sessione(req, res, next) {
   }
 }
 
+// Risolve la tessera dal contenuto del QR. Dal 2026-10 il QR è il codice
+// statico tessere.codice_qr; per le app non ancora aggiornate si accetta
+// ancora il vecchio token JWT rotante (ha due punti dentro, un codice no).
+async function tesseraDaQr(contenuto) {
+  const testo = String(contenuto || '').trim();
+  if (!testo) return { errore: 'QR vuoto.' };
+  const SELECT = `SELECT t.id AS tessera_id, t.stato, t.codice_qr, c.id AS cliente_id, c.nome, c.stato AS cliente_stato,
+                         c.livello_id, c.convenzione_id
+                  FROM tessere t JOIN clienti c ON c.id = t.cliente_id`;
+  if (testo.split('.').length === 3) {
+    let payload;
+    try { payload = jwtService.verificaTokenQr(testo); }
+    catch { return { errore: 'QR non valido o scaduto. Chiedi al cliente di aggiornare la schermata.' }; }
+    const { rows } = await pool.query(`${SELECT} WHERE t.id = $1 AND t.cliente_id = $2`, [payload.tesseraId, payload.clienteId]);
+    return rows[0] ? { info: rows[0] } : { errore: 'Tessera non trovata.' };
+  }
+  const { rows } = await pool.query(`${SELECT} WHERE t.codice_qr = $1`, [testo.toUpperCase()]);
+  return rows[0] ? { info: rows[0] } : { errore: 'Tessera non trovata.' };
+}
+
 async function scansione(req, res, next) {
   try {
-    const { qrToken } = req.body;
-    let payload;
-    try {
-      payload = jwtService.verificaTokenQr(qrToken);
-    } catch {
-      return res.status(400).json({ errore: 'QR non valido o scaduto. Chiedi al cliente di aggiornare la schermata.' });
-    }
-
-    const { rows: tessereRows } = await pool.query(
-      `SELECT t.stato, c.id AS cliente_id, c.nome, c.stato AS cliente_stato,
-              c.livello_id, c.convenzione_id
-       FROM tessere t JOIN clienti c ON c.id = t.cliente_id
-       WHERE t.id = $1 AND t.cliente_id = $2`,
-      [payload.tesseraId, payload.clienteId]
-    );
-    if (tessereRows.length === 0) return res.status(404).json({ errore: 'Tessera non trovata.' });
-    const info = tessereRows[0];
+    const { qrToken, codice } = req.body;
+    const r = await tesseraDaQr(codice ?? qrToken);
+    if (r.errore) return res.status(r.errore === 'Tessera non trovata.' ? 404 : 400).json({ errore: r.errore });
+    const info = r.info;
+    const payload = { tesseraId: info.tessera_id, clienteId: info.cliente_id };
 
     if (info.stato !== 'attiva') return res.status(403).json({ errore: 'Tessera bloccata o revocata.' });
     if (info.cliente_stato !== 'attivo') return res.status(403).json({ errore: 'Account cliente non attivo.' });
@@ -118,15 +127,41 @@ async function scansione(req, res, next) {
       })
       .catch(() => {});
 
+    // Promo caricate dal cliente e utilizzabili adesso in questa sede: le
+    // vede l'operatore, le applica in cassa e le segna usate.
+    const promozioni = await promozioniService.caricateUtilizzabili(info.cliente_id, req.sedeId);
+
     res.json({
       esito,
-      cliente: { nome: info.nome },
+      cliente: { nome: info.nome, codiceQr: info.codice_qr },
       livello: d.livello_nome ? { nome: d.livello_nome, scontoPercentuale: d.livello_sconto, colore: d.livello_colore } : null,
       convenzione: d.convenzione_nome ? { nome: d.convenzione_nome, scontoPercentuale: d.convenzione_sconto } : null,
+      promozioni: promozioni.map(p => ({
+        id: p.id, titolo: p.titolo, descrizione: p.descrizione, tipo: p.tipo, valore: p.valore, prodotto: p.prodotto,
+        usiRimasti: p.usiPerCliente == null ? null : p.usiPerCliente - p.usi,
+      })),
     });
   } catch (err) {
     next(err);
   }
 }
 
-module.exports = { elencoSedi, login, logout, scansione, sessione };
+// POST /operatore/promozioni/:id/usa { codice } — segna la promo come usata
+// per il cliente della tessera scansionata, in questa sede.
+async function usaPromozione(req, res, next) {
+  try {
+    const promozioneId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(promozioneId)) return res.status(400).json({ errore: 'Promozione non valida.' });
+    const r = await tesseraDaQr(req.body.codice);
+    if (r.errore) return res.status(400).json({ errore: r.errore });
+    if (r.info.stato !== 'attiva' || r.info.cliente_stato !== 'attivo')
+      return res.status(403).json({ errore: 'Tessera o account non attivi.' });
+    const esito = await promozioniService.segnaUsata({ clienteId: r.info.cliente_id, sedeId: req.sedeId, promozioneId });
+    if (!esito.ok) return res.status(409).json({ errore: esito.errore });
+    res.json({ ok: true, usiRimasti: esito.usiRimasti });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { elencoSedi, login, logout, scansione, sessione, usaPromozione };

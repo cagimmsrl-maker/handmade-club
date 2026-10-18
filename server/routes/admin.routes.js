@@ -6,6 +6,7 @@ const adminSediController = require('../controllers/adminSediController');
 const adminParametriController = require('../controllers/adminParametriController');
 const adminDashboardController = require('../controllers/adminDashboardController');
 const adminClientiController = require('../controllers/adminClientiController');
+const adminPromozioniController = require('../controllers/adminPromozioniController');
 const authAdmin = require('../middleware/authAdmin');
 const validate = require('../middleware/validate');
 const { limitatorePubblico } = require('../middleware/rateLimiters');
@@ -15,6 +16,7 @@ const {
   convenzioneSchema,
   sedeSchema,
   parametriSchema,
+  promozioneSchema,
 } = require('../schemas/admin.schema');
 
 const router = express.Router();
@@ -45,6 +47,13 @@ router.get('/parametri', adminParametriController.leggi);
 router.put('/parametri', validate(parametriSchema), adminParametriController.aggiorna);
 
 router.get('/dashboard', adminDashboardController.dashboard);
+
+router.get('/promozioni', adminPromozioniController.lista);
+router.post('/promozioni', validate(promozioneSchema), adminPromozioniController.crea);
+router.put('/promozioni/:id', validate(promozioneSchema), adminPromozioniController.aggiorna);
+router.post('/promozioni/:id/pubblica', adminPromozioniController.pubblica);
+router.post('/promozioni/:id/archivia', adminPromozioniController.archivia);
+router.delete('/promozioni/:id', adminPromozioniController.elimina);
 
 router.get('/clienti', adminClientiController.elenco);
 router.post('/clienti/:id/blocca-tessera', adminClientiController.bloccaTessera);

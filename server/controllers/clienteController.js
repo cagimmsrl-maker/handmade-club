@@ -1,6 +1,7 @@
 const pool = require('../db/pool');
 const jwtService = require('../services/jwtService');
 const livelloService = require('../services/livelloService');
+const promozioniService = require('../services/promozioniService');
 
 async function me(req, res, next) {
   try {
@@ -8,7 +9,7 @@ async function me(req, res, next) {
       `SELECT c.nome, c.cognome, c.email, c.data_nascita, c.consenso_marketing_il,
               l.nome AS livello_nome, l.colore AS livello_colore, l.sconto_percentuale AS livello_sconto,
               conv.nome AS convenzione_nome, conv.sconto_percentuale AS convenzione_sconto,
-              t.codice AS tessera_codice
+              t.codice AS tessera_codice, t.codice_qr AS tessera_codice_qr
        FROM clienti c
        LEFT JOIN livelli l ON l.id = c.livello_id
        LEFT JOIN convenzioni conv ON conv.id = c.convenzione_id AND conv.attiva = true
@@ -21,6 +22,11 @@ async function me(req, res, next) {
 
     const visite = await livelloService.contaVisiteFinestra(req.clienteId);
     const { prossimoLivello, visiteMancanti } = await livelloService.progresso(visite);
+    const { rows: [{ n: promoCaricate }] } = await pool.query(
+      `SELECT count(*)::int AS n FROM promozioni_clienti pc JOIN promozioni p ON p.id = pc.promozione_id
+       WHERE pc.cliente_id = $1 AND p.stato = 'pubblicata' AND p.valido_al >= CURRENT_DATE`,
+      [req.clienteId]
+    );
 
     res.json({
       nome: r.nome,
@@ -28,7 +34,10 @@ async function me(req, res, next) {
       email: r.email,
       dataNascita: r.data_nascita,
       consensoMarketing: !!r.consenso_marketing_il,
-      tessera: { codice: r.tessera_codice },
+      // codiceQr: contenuto del QR statico (vedi migrazione 003). Il
+      // codice umano HC-000042 resta per il cliente e l'assistenza.
+      tessera: { codice: r.tessera_codice, codiceQr: r.tessera_codice_qr },
+      promoCaricate,
       livello: r.livello_nome
         ? { nome: r.livello_nome, colore: r.livello_colore, scontoPercentuale: r.livello_sconto }
         : null,
@@ -46,15 +55,42 @@ async function me(req, res, next) {
   }
 }
 
+// Compatibilità: le app già installate (PWA) possono chiedere ancora il
+// token rotante finché non si aggiornano. Rispondono con il codice fisso,
+// che l'operatore accetta allo stesso modo.
 async function qrToken(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `SELECT id FROM tessere WHERE cliente_id = $1 AND stato = 'attiva'`,
+      `SELECT codice_qr FROM tessere WHERE cliente_id = $1 AND stato = 'attiva'`,
       [req.clienteId]
     );
     if (rows.length === 0) return res.status(404).json({ errore: 'Tessera non trovata o non attiva.' });
-    const token = jwtService.creaTokenQr({ tesseraId: rows[0].id, clienteId: req.clienteId });
-    res.json({ token, rotazioneSecondi: 60 });
+    res.json({ token: rows[0].codice_qr, rotazioneSecondi: 3600, statico: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Bacheca promozioni: disponibili per il cliente + quelle già caricate.
+async function promozioni(req, res, next) {
+  try {
+    const tutte = await promozioniService.bachecaPerCliente(req.clienteId);
+    res.json({
+      caricate: tutte.filter(p => p.caricata),
+      disponibili: tutte.filter(p => !p.caricata),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function caricaPromozione(req, res, next) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ errore: 'Promozione non valida.' });
+    const esito = await promozioniService.carica(req.clienteId, id);
+    if (!esito.ok) return res.status(404).json({ errore: esito.errore });
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }
@@ -114,4 +150,4 @@ async function cancellaAccount(req, res, next) {
   }
 }
 
-module.exports = { me, qrToken, aggiornaProfilo, attivaConvenzione, revocaConsensoMarketing, cancellaAccount };
+module.exports = { me, qrToken, promozioni, caricaPromozione, aggiornaProfilo, attivaConvenzione, revocaConsensoMarketing, cancellaAccount };

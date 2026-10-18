@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { api } from '../../api.js'
+import { etichettaTipo } from '../../lib/promo.js'
 
 const ID_LETTORE = 'lettore-qr'
 
@@ -32,7 +33,7 @@ export default function Scanner({ sede }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function onScansioneRiuscita(qrToken) {
+  async function onScansioneRiuscita(codice) {
     if (scansioneInCorsoRef.current) return
     scansioneInCorsoRef.current = true
     setErroreScansione('')
@@ -42,8 +43,10 @@ export default function Scanner({ sede }) {
       /* già in pausa */
     }
     try {
-      const dati = await api.post('/operatore/scansione', { qrToken })
-      setRisultato(dati)
+      // `codice` è il QR statico della tessera (o il vecchio token per le
+      // app non aggiornate: il server li distingue da solo).
+      const dati = await api.post('/operatore/scansione', { codice })
+      setRisultato({ ...dati, codiceScansionato: codice })
     } catch (err) {
       setErroreScansione(err.message)
     }
@@ -82,8 +85,27 @@ export default function Scanner({ sede }) {
 }
 
 function CardEsito({ risultato, onNuovaScansione }) {
-  const { esito, cliente, livello, convenzione } = risultato
+  const { esito, cliente, livello, convenzione, codiceScansionato } = risultato
   const giaRegistrata = esito === 'visita_gia_registrata'
+  const [promozioni, setPromozioni] = useState(risultato.promozioni ?? [])
+  const [usate, setUsate] = useState({})
+  const [errorePromo, setErrorePromo] = useState('')
+  const [inCorso, setInCorso] = useState(null)
+
+  async function applica(p) {
+    setInCorso(p.id)
+    setErrorePromo('')
+    try {
+      const r = await api.post(`/operatore/promozioni/${p.id}/usa`, { codice: codiceScansionato })
+      setUsate((u) => ({ ...u, [p.id]: true }))
+      if (r.usiRimasti != null && r.usiRimasti <= 0) {
+        setPromozioni((lista) => lista.map((x) => (x.id === p.id ? { ...x, usiRimasti: 0 } : x)))
+      }
+    } catch (err) {
+      setErrorePromo(err.message)
+    }
+    setInCorso(null)
+  }
 
   return (
     <div className="card" style={{ textAlign: 'center' }}>
@@ -104,6 +126,42 @@ function CardEsito({ risultato, onNuovaScansione }) {
         <p style={{ fontSize: '1.2rem' }}>
           Convenzione <strong>{convenzione.nome}</strong> — sconto <strong>{convenzione.scontoPercentuale}%</strong>
         </p>
+      )}
+
+      {promozioni.length > 0 && (
+        <div style={{ textAlign: 'left', marginTop: 16 }}>
+          <h3 style={{ margin: '0 0 8px' }}>Promo caricate dal cliente</h3>
+          {promozioni.map((p) => (
+            <div
+              key={p.id}
+              style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+                padding: '10px 12px', border: '1px solid var(--colore-bordo)', borderRadius: 10, marginBottom: 8,
+                background: usate[p.id] ? 'var(--colore-sfondo, #f6f6f6)' : 'white',
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: '1.05rem' }}>{p.titolo}</strong>
+                {etichettaTipo(p) && <div style={{ fontSize: '1rem' }}>{etichettaTipo(p)}</div>}
+                {p.tipo === 'messaggio' && p.descrizione && <div className="testo-secondario">{p.descrizione}</div>}
+                {p.usiRimasti != null && <div className="testo-secondario">usi rimasti: {usate[p.id] ? Math.max(0, p.usiRimasti - 1) : p.usiRimasti}</div>}
+              </div>
+              {p.tipo !== 'messaggio' && (
+                usate[p.id] ? (
+                  <span className="badge" style={{ background: 'var(--colore-primario)' }}>Applicata ✓</span>
+                ) : (
+                  <button className="btn btn-primario" onClick={() => applica(p)} disabled={inCorso === p.id}>
+                    {inCorso === p.id ? '…' : 'Applicata'}
+                  </button>
+                )
+              )}
+            </div>
+          ))}
+          {errorePromo && <p className="messaggio-errore">{errorePromo}</p>}
+          <p className="testo-secondario" style={{ fontSize: '0.8rem' }}>
+            Applica lo sconto in cassa e premi "Applicata" per segnarla usata.
+          </p>
+        </div>
       )}
 
       <button className="btn btn-primario" style={{ marginTop: 20 }} onClick={onNuovaScansione}>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../../api.js'
-import QrRotante from '../../components/QrRotante.jsx'
+import QrStatico from '../../components/QrStatico.jsx'
 
 export default function Home() {
   const [dati, setDati] = useState(null)
@@ -28,11 +29,17 @@ export default function Home() {
             Livello {livello.nome} · sconto {livello.scontoPercentuale}%
           </span>
         )}
-        <p className="testo-secondario" style={{ marginTop: 8 }}>
-          Tessera {dati.tessera.codice}
-        </p>
-        <QrRotante />
+        <QrStatico codiceQr={dati.tessera.codiceQr} codiceTessera={dati.tessera.codice} />
       </div>
+
+      <Link to="/promozioni" className="card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+        <strong>Promozioni</strong>
+        <p className="testo-secondario" style={{ margin: '4px 0 0' }}>
+          {dati.promoCaricate > 0
+            ? `${dati.promoCaricate} promo ${dati.promoCaricate === 1 ? 'caricata' : 'caricate'} sulla tessera · vedi tutte →`
+            : 'Scopri le promo per te e caricale sulla tessera →'}
+        </p>
+      </Link>
 
       {progresso?.prossimoLivello && (
         <div className="card">

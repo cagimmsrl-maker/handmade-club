@@ -9,7 +9,9 @@ const router = express.Router();
 router.use(authCliente);
 
 router.get('/me', clienteController.me);
-router.get('/qr-token', clienteController.qrToken);
+router.get('/qr-token', clienteController.qrToken); // compatibilità app già installate
+router.get('/promozioni', clienteController.promozioni);
+router.post('/promozioni/:id/carica', clienteController.caricaPromozione);
 router.put('/profilo', validate(profiloSchema), clienteController.aggiornaProfilo);
 router.post('/convenzione', validate(convenzioneSchema), clienteController.attivaConvenzione);
 router.delete('/consenso-marketing', clienteController.revocaConsensoMarketing);
