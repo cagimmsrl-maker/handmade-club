@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../../api.js'
 import Testata from '../../components/Testata.jsx'
 import Tessera from '../../components/Tessera.jsx'
+import BannerInstalla from '../../components/BannerInstalla.jsx'
 
 export default function Home() {
   const [dati, setDati] = useState(null)
@@ -35,6 +36,8 @@ export default function Home() {
         livello={livello}
         visite={progresso?.visite}
       />
+
+      <BannerInstalla />
 
       <Link to="/promozioni" className="card card-link">
         <span className="icona" aria-hidden="true">%</span>
