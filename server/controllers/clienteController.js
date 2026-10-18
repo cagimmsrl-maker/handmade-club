@@ -2,11 +2,12 @@ const pool = require('../db/pool');
 const jwtService = require('../services/jwtService');
 const livelloService = require('../services/livelloService');
 const promozioniService = require('../services/promozioniService');
+const otpService = require('../services/otpService');
 
 async function me(req, res, next) {
   try {
     const { rows } = await pool.query(
-      `SELECT c.nome, c.cognome, c.email, c.data_nascita, c.consenso_marketing_il,
+      `SELECT c.nome, c.cognome, c.email, c.data_nascita, c.consenso_marketing_il, c.telefono, c.telefono_verificato,
               l.nome AS livello_nome, l.colore AS livello_colore, l.sconto_percentuale AS livello_sconto,
               conv.nome AS convenzione_nome, conv.sconto_percentuale AS convenzione_sconto,
               t.codice AS tessera_codice, t.codice_qr AS tessera_codice_qr
@@ -34,6 +35,8 @@ async function me(req, res, next) {
       email: r.email,
       dataNascita: r.data_nascita,
       consensoMarketing: !!r.consenso_marketing_il,
+      telefono: r.telefono,
+      telefonoVerificato: !!r.telefono_verificato,
       // codiceQr: contenuto del QR statico (vedi migrazione 003). Il
       // codice umano HC-000042 resta per il cliente e l'assistenza.
       tessera: { codice: r.tessera_codice, codiceQr: r.tessera_codice_qr },
@@ -88,8 +91,41 @@ async function caricaPromozione(req, res, next) {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) return res.status(400).json({ errore: 'Promozione non valida.' });
+    // Le promo si caricano solo con numero verificato: è il momento in cui
+    // la verifica vale qualcosa per il cliente (vedi migrazione 004).
+    const { rows: [c] } = await pool.query('SELECT telefono_verificato FROM clienti WHERE id = $1', [req.clienteId]);
+    if (!c?.telefono_verificato)
+      return res.status(403).json({ errore: 'Per caricare le promozioni verifica prima il tuo numero.', codice: 'VERIFICA_RICHIESTA' });
     const esito = await promozioniService.carica(req.clienteId, id);
     if (!esito.ok) return res.status(404).json({ errore: esito.errore });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Verifica differita del numero (cliente già loggato, non verificato).
+async function richiediVerifica(req, res, next) {
+  try {
+    const { rows: [c] } = await pool.query('SELECT telefono, telefono_verificato FROM clienti WHERE id = $1', [req.clienteId]);
+    if (!c) return res.status(404).json({ errore: 'Cliente non trovato.' });
+    if (c.telefono_verificato) return res.json({ ok: true, giaVerificato: true });
+    await otpService.richiediOtp(c.telefono);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function confermaVerifica(req, res, next) {
+  try {
+    const { rows: [c] } = await pool.query('SELECT telefono, telefono_verificato FROM clienti WHERE id = $1', [req.clienteId]);
+    if (!c) return res.status(404).json({ errore: 'Cliente non trovato.' });
+    if (c.telefono_verificato) return res.json({ ok: true, giaVerificato: true });
+    await otpService.verificaOtp(c.telefono, req.body.codice);
+    // Qui NON si invalidano le sessioni: a verificare è la sessione stessa
+    // che ha creato l'account, cioè il titolare del numero.
+    await pool.query('UPDATE clienti SET telefono_verificato = true WHERE id = $1', [req.clienteId]);
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -150,4 +186,4 @@ async function cancellaAccount(req, res, next) {
   }
 }
 
-module.exports = { me, qrToken, promozioni, caricaPromozione, aggiornaProfilo, attivaConvenzione, revocaConsensoMarketing, cancellaAccount };
+module.exports = { me, qrToken, promozioni, caricaPromozione, richiediVerifica, confermaVerifica, aggiornaProfilo, attivaConvenzione, revocaConsensoMarketing, cancellaAccount };

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api.js'
+import VerificaNumero from '../../components/VerificaNumero.jsx'
 
 export default function Profilo({ onAccountCancellato }) {
   const [dati, setDati] = useState(null)
@@ -13,6 +14,7 @@ export default function Profilo({ onAccountCancellato }) {
   const [messaggioConvenzione, setMessaggioConvenzione] = useState('')
   const [erroreProfilo, setErroreProfilo] = useState('')
   const [erroreConvenzione, setErroreConvenzione] = useState('')
+  const [verificaAperta, setVerificaAperta] = useState(false)
 
   function carica() {
     api.get('/cliente/me').then((d) => {
@@ -76,6 +78,26 @@ export default function Profilo({ onAccountCancellato }) {
   return (
     <div className="schermo">
       <h1>Profilo</h1>
+
+      <div className="card">
+        <p style={{ margin: 0 }}>
+          Numero <strong>{dati.telefono}</strong>{' '}
+          {dati.telefonoVerificato
+            ? <span className="badge" style={{ background: 'var(--colore-primario)' }}>verificato ✓</span>
+            : <span className="badge" style={{ background: '#999' }}>da verificare</span>}
+        </p>
+        {!dati.telefonoVerificato && !verificaAperta && (
+          <>
+            <p className="testo-secondario" style={{ marginBottom: 8 }}>
+              Verificalo per caricare le promozioni e ricevere le novità. Si fa una volta sola.
+            </p>
+            <button className="btn btn-secondario" onClick={() => setVerificaAperta(true)}>Verifica ora</button>
+          </>
+        )}
+      </div>
+      {!dati.telefonoVerificato && verificaAperta && (
+        <VerificaNumero telefono={dati.telefono} onVerificato={() => { setVerificaAperta(false); carica() }} onAnnulla={() => setVerificaAperta(false)} />
+      )}
 
       <form className="card" onSubmit={salvaProfilo}>
         <h2>I tuoi dati</h2>

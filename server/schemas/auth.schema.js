@@ -23,4 +23,17 @@ const completaProfiloSchema = z.object({
   consensoMarketing: z.boolean().default(false),
 });
 
-module.exports = { richiediOtpSchema, verificaOtpSchema, completaProfiloSchema };
+const registraSchema = z.object({
+  telefono: telefonoSchema,
+  nome: z.string().trim().min(1, 'Il nome è obbligatorio').max(100),
+  cognome: z.string().trim().max(100).optional().nullable(),
+  email: z.string().trim().email('Email non valida').max(200).optional().nullable().or(z.literal('')),
+  dataNascita: z.string().date().optional().nullable().or(z.literal('')),
+  consensoMarketing: z.boolean().default(false),
+});
+
+const confermaVerificaSchema = z.object({
+  codice: z.string().regex(/^\d{6}$/, 'Codice non valido'),
+});
+
+module.exports = { richiediOtpSchema, verificaOtpSchema, completaProfiloSchema, registraSchema, confermaVerificaSchema };

@@ -3,7 +3,8 @@
 ## Cos'è questo progetto
 
 App web pubblica (PWA) per i clienti finali dei punti vendita Handmade Café (Car Food S.r.l.).
-Funzionalità Tappa 1: registrazione con telefono + OTP, tessera fedeltà digitale con QR code,
+Funzionalità: registrazione immediata con verifica OTP differita, tessera fedeltà digitale con QR statico,
+promozioni da caricare, 
 livelli dinamici basati sulle visite, convenzioni aziendali, pannello admin, schermata scansione operatore.
 
 **Questo NON è il gestionale interno.** È un sistema separato: repository separato, database separato,
@@ -58,7 +59,7 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
    - Input validation su ogni endpoint (mai fidarsi del client)
    - Nessun dato sensibile nei log
 5. **Ruoli separati.** Tre superfici distinte:
-   - `/` → app cliente (pubblica, login OTP)
+   - `/` → app cliente (pubblica, registrazione immediata + verifica OTP differita, vedi sotto)
    - `/operatore` → schermata scansione QR (login con PIN sede, pensata per tablet al banco)
    - `/admin` → pannello amministrazione (login con password, solo titolare/manager)
 6. **QR statico (dal 18/10/2026, migrazione 003).** Il QR del cliente è `tessere.codice_qr`, un codice
@@ -71,6 +72,25 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
 7. **GDPR by design.** Consensi tracciati con timestamp in colonne dedicate. Consenso marketing
    SEPARATO e facoltativo. Endpoint di cancellazione account self-service (soft delete + anonimizzazione).
 8. **Lingua.** Tutta l'interfaccia utente in italiano.
+
+## Accesso cliente — "entri subito, verifichi dopo" (migrazione 004, dal 18/10/2026)
+
+- **Registrazione immediata** (`POST /auth/registra`): nome + telefono + consensi → tessera subito,
+  sessione aperta, `telefono_verificato = false`. Nessun OTP all'ingresso: al banco l'iscrizione deve
+  durare 10 secondi. Se il numero esiste già → 409 `GIA_REGISTRATO` e si manda al login con codice.
+- **Verifica differita** (`POST /cliente/verifica/richiedi` + `/conferma`, cliente loggato): l'OTP
+  va al numero già registrato. È richiesta per **caricare una promozione** (`carica` risponde 403
+  `VERIFICA_RICHIESTA` se non verificato) e lo sarà per le notifiche push. Componente
+  `VerificaNumero` nel client, usato da Profilo e bacheca Promo.
+- **Login con codice** (`/auth/richiedi-otp` + `/verifica-otp`): per chi ha già la tessera e deve
+  rientrare (telefono nuovo, sessione scaduta). Chi supera l'OTP è il titolare del numero: se
+  l'account era stato creato senza verifica, `clienti.sessioni_valide_da = now()` e `authCliente`
+  rifiuta ogni JWT emesso prima (`iat`). Così chi si fosse registrato con il numero di un altro
+  perde l'accesso nel momento in cui il vero titolare verifica. Non rimuovere questo controllo.
+- **SMS**: `smsService` ha i provider `console` (solo log: in produzione il cliente NON riceve il
+  codice) e `skebby` (API REST, variabili `SKEBBY_*` nel `.env`). Finché `SMS_PROVIDER=console`,
+  la verifica funziona solo leggendo il codice dai log PM2: va attivato Skebby prima di aprire
+  l'app ai clienti. Nei log il numero è sempre mascherato.
 
 ## Logica di dominio — Livelli e convenzioni
 
