@@ -144,7 +144,10 @@ export default function Onboarding({ onCompletato }) {
 
   return (
     <div className="schermo">
-      <h1>Handmade Club</h1>
+      <div className="onboarding-hero">
+        <img src="/brand/logo.png" alt="Handmade Café" />
+        <p>La tessera fedeltà di Handmade Café: visite, livelli e promozioni, sul tuo telefono.</p>
+      </div>
 
       {modo === MODO_REGISTRA && (
         <form className="card" onSubmit={registra}>

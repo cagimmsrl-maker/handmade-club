@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api.js'
+import Testata from '../../components/Testata.jsx'
 import VerificaNumero from '../../components/VerificaNumero.jsx'
 
 export default function Profilo({ onAccountCancellato }) {
@@ -77,7 +78,7 @@ export default function Profilo({ onAccountCancellato }) {
 
   return (
     <div className="schermo">
-      <h1>Profilo</h1>
+      <Testata saluto="Profilo" />
 
       <div className="card">
         <p style={{ margin: 0 }}>

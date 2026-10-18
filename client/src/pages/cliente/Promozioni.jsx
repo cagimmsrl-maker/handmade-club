@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api.js'
+import Testata from '../../components/Testata.jsx'
 import CardPromo from '../../components/CardPromo.jsx'
 import VerificaNumero from '../../components/VerificaNumero.jsx'
 
@@ -52,7 +53,7 @@ export default function Promozioni() {
 
   return (
     <div className="schermo">
-      <h1>Promozioni</h1>
+      <Testata saluto="Promozioni" />
       {errore && <p className="messaggio-errore">{errore}</p>}
 
       {verificaPer !== null && me && (

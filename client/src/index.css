@@ -1,16 +1,27 @@
 :root {
-  --colore-testo: #1f1f1f;
-  --colore-sfondo: #faf8f5;
+  /* Palette Handmade Café: terracotta del logo, crema del sito, nero caldo. */
+  --terracotta: #80321A;
+  --terracotta-viva: #C8431C;
+  --terracotta-scura: #5E2412;
+  --crema: #FFF1E2;
+  --crema-scura: #F3E4D2;
+  --nero-caldo: #1E1A17;
+  --marrone: #5C4B3F;
+
+  --colore-testo: var(--nero-caldo);
+  --colore-testo-secondario: #6F6158;
+  --colore-sfondo: #FAF4EC;
   --colore-superficie: #ffffff;
-  --colore-bordo: #e4ddd1;
-  --colore-primario: #2b2b2b;
+  --colore-bordo: #E8DCCD;
+  --colore-primario: var(--terracotta);
   --colore-primario-testo: #ffffff;
   --colore-errore: #b3261e;
   --colore-successo: #2e7d32;
-  --raggio: 14px;
-  --ombra: 0 2px 10px rgba(0, 0, 0, 0.06);
+  --raggio: 16px;
+  --ombra: 0 2px 12px rgba(94, 36, 18, 0.08);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 * {
@@ -26,6 +37,136 @@ body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   background: var(--colore-sfondo);
   color: var(--colore-testo);
+}
+
+h1 { font-size: 1.5rem; letter-spacing: -0.01em; }
+h2 { font-size: 1.15rem; }
+
+/* Testata con il logo: su tutte le schermate cliente e nell'onboarding. */
+.testata {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 2px 0 18px;
+}
+.testata img { height: 44px; width: auto; display: block; }
+.testata .saluto { font-size: 0.95rem; color: var(--colore-testo-secondario); text-align: right; }
+.testata .saluto strong { color: var(--colore-testo); display: block; font-size: 1.05rem; }
+
+.onboarding-hero {
+  text-align: center;
+  padding: 18px 0 10px;
+}
+.onboarding-hero img { height: 78px; width: auto; }
+.onboarding-hero p { margin: 10px 0 0; color: var(--colore-testo-secondario); }
+
+/* Tessera fedeltà: card scura con terracotta, QR su "finestra" bianca. */
+.card.tessera {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, var(--nero-caldo) 0%, #2C221D 55%, var(--terracotta-scura) 100%);
+  color: var(--crema);
+  border: none;
+  border-radius: 22px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 14px 34px rgba(30, 26, 23, 0.28);
+}
+.card.tessera::after {
+  content: '';
+  position: absolute;
+  right: -60px; top: -60px;
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200, 67, 28, 0.35), transparent 70%);
+  pointer-events: none;
+}
+.tessera-intestazione {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.tessera-intestazione img { height: 30px; width: auto; }
+.tessera-livello {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 241, 226, 0.14);
+  color: var(--crema);
+  border: 1px solid rgba(255, 241, 226, 0.25);
+}
+.tessera-qr {
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px;
+  display: inline-block;
+  margin: 4px auto 0;
+}
+.tessera-codice {
+  margin: 12px 0 2px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.18em;
+  font-size: 1.05rem;
+  color: #fff;
+}
+.tessera-nota { margin: 0; font-size: 0.78rem; color: rgba(255, 241, 226, 0.75); }
+.tessera-piede {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  font-size: 0.8rem;
+  color: rgba(255, 241, 226, 0.8);
+}
+.tessera-piede strong { color: #fff; font-weight: 600; }
+
+/* Barra progresso livello */
+.progresso {
+  height: 8px;
+  background: var(--crema-scura);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 10px 0 6px;
+}
+.progresso > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--terracotta), var(--terracotta-viva));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+/* Scorciatoia promo nella home */
+.card-link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.card-link:active { transform: scale(0.99); }
+.card-link .icona {
+  width: 44px; height: 44px; flex: none;
+  border-radius: 12px;
+  background: var(--crema);
+  color: var(--terracotta);
+  display: grid; place-items: center;
+  font-size: 1.3rem;
+}
+.card-link .freccia { margin-left: auto; color: var(--colore-testo-secondario); font-size: 1.2rem; }
+.card-link .contatore {
+  background: var(--terracotta);
+  color: #fff;
+  border-radius: 999px;
+  min-width: 22px; height: 22px;
+  display: inline-grid; place-items: center;
+  font-size: 0.75rem; font-weight: 700;
+  padding: 0 7px;
 }
 
 .schermo {
@@ -80,9 +221,11 @@ p {
 }
 
 .campo input:focus, .campo select:focus {
-  outline: 2px solid var(--colore-primario);
+  outline: 2px solid var(--terracotta-viva);
   outline-offset: 1px;
 }
+.campo input, .campo select { accent-color: var(--terracotta); }
+.campo-checkbox input { accent-color: var(--terracotta); }
 
 .campo-checkbox {
   display: flex;
@@ -114,7 +257,10 @@ p {
 .btn-primario {
   background: var(--colore-primario);
   color: var(--colore-primario-testo);
+  box-shadow: 0 4px 14px rgba(128, 50, 26, 0.25);
 }
+.btn-primario:hover:not(:disabled) { background: var(--terracotta-scura); }
+.btn-primario:active:not(:disabled) { transform: translateY(1px); }
 
 .btn-primario:disabled {
   opacity: 0.5;
@@ -122,10 +268,11 @@ p {
 }
 
 .btn-secondario {
-  background: transparent;
-  color: var(--colore-testo);
+  background: var(--colore-superficie);
+  color: var(--terracotta);
   border: 1px solid var(--colore-bordo);
 }
+.btn-secondario:hover:not(:disabled) { border-color: var(--terracotta); }
 
 .btn-pericolo {
   background: var(--colore-errore);
@@ -144,14 +291,14 @@ p {
 }
 
 .testo-secondario {
-  color: #6b6b6b;
+  color: var(--colore-testo-secondario);
   font-size: 0.9rem;
 }
 
 .link-testo {
   background: none;
   border: none;
-  color: var(--colore-testo);
+  color: var(--terracotta);
   text-decoration: underline;
   font-size: 0.9rem;
   cursor: pointer;
@@ -161,10 +308,12 @@ p {
 nav.tab-bar {
   display: flex;
   border-top: 1px solid var(--colore-bordo);
-  background: var(--colore-superficie);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
   position: sticky;
   bottom: 0;
-  margin-top: auto;
+  margin: auto -16px 0;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 nav.tab-bar a, nav.tab-bar button {
@@ -180,9 +329,10 @@ nav.tab-bar a, nav.tab-bar button {
   cursor: pointer;
 }
 
+nav.tab-bar a { color: var(--colore-testo-secondario); border-top: 3px solid transparent; }
 nav.tab-bar a.attivo {
   color: var(--colore-primario);
-  border-bottom: 3px solid var(--colore-primario);
+  border-top: 3px solid var(--colore-primario);
 }
 
 table.tabella-admin {
@@ -214,6 +364,7 @@ table.tabella-admin th, table.tabella-admin td {
 .metrica .valore {
   font-size: 1.8rem;
   font-weight: 700;
+  color: var(--terracotta);
 }
 
 .badge {

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api.js'
-import QrStatico from '../../components/QrStatico.jsx'
+import Testata from '../../components/Testata.jsx'
+import Tessera from '../../components/Tessera.jsx'
 
 export default function Home() {
   const [dati, setDati] = useState(null)
@@ -18,44 +19,49 @@ export default function Home() {
   if (!dati) return <div className="schermo"><p className="testo-secondario">Caricamento...</p></div>
 
   const { livello, convenzione, progresso } = dati
+  const prossimo = progresso?.prossimoLivello
+  const percentuale = prossimo && prossimo.sogliaVisite > 0
+    ? Math.min(100, Math.round((progresso.visite / prossimo.sogliaVisite) * 100))
+    : 100
 
   return (
     <div className="schermo">
-      <h1>Ciao, {dati.nome}</h1>
+      <Testata saluto="Ciao," nome={dati.nome} />
 
-      <div className="card" style={{ textAlign: 'center' }}>
-        {livello && (
-          <span className="badge" style={{ background: livello.colore, marginBottom: 10 }}>
-            Livello {livello.nome} · sconto {livello.scontoPercentuale}%
+      <Tessera
+        nome={`${dati.nome}${dati.cognome ? ' ' + dati.cognome : ''}`}
+        codiceQr={dati.tessera.codiceQr}
+        codiceTessera={dati.tessera.codice}
+        livello={livello}
+        visite={progresso?.visite}
+      />
+
+      <Link to="/promozioni" className="card card-link">
+        <span className="icona" aria-hidden="true">%</span>
+        <span>
+          <strong>Promozioni</strong>
+          <span className="testo-secondario" style={{ display: 'block', marginTop: 2 }}>
+            {dati.promoCaricate > 0 ? 'Le tue promo sono sulla tessera' : 'Scopri le promo per te'}
           </span>
-        )}
-        <QrStatico codiceQr={dati.tessera.codiceQr} codiceTessera={dati.tessera.codice} />
-      </div>
-
-      <Link to="/promozioni" className="card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
-        <strong>Promozioni</strong>
-        <p className="testo-secondario" style={{ margin: '4px 0 0' }}>
-          {dati.promoCaricate > 0
-            ? `${dati.promoCaricate} promo ${dati.promoCaricate === 1 ? 'caricata' : 'caricate'} sulla tessera · vedi tutte →`
-            : 'Scopri le promo per te e caricale sulla tessera →'}
-        </p>
+        </span>
+        {dati.promoCaricate > 0 && <span className="contatore">{dati.promoCaricate}</span>}
+        <span className="freccia" aria-hidden="true">›</span>
       </Link>
 
-      {progresso?.prossimoLivello && (
+      {prossimo && (
         <div className="card">
-          <p>
-            Ti mancano <strong>{progresso.visiteMancanti}</strong> visite per diventare{' '}
-            <strong>{progresso.prossimoLivello.nome}</strong>.
+          <strong>Verso il livello {prossimo.nome}</strong>
+          <div className="progresso"><div style={{ width: `${percentuale}%` }} /></div>
+          <p className="testo-secondario" style={{ margin: 0 }}>
+            {progresso.visite} {progresso.visite === 1 ? 'visita' : 'visite'} su {prossimo.sogliaVisite} · te ne {progresso.visiteMancanti === 1 ? 'manca una' : `mancano ${progresso.visiteMancanti}`}
           </p>
         </div>
       )}
 
       {convenzione && (
         <div className="card">
-          <h3>Convenzione attiva</h3>
-          <p>
-            {convenzione.nome} · sconto {convenzione.scontoPercentuale}%
-          </p>
+          <strong>Convenzione {convenzione.nome}</strong>
+          <p className="testo-secondario" style={{ margin: '4px 0 0' }}>Sconto {convenzione.scontoPercentuale}% riservato</p>
         </div>
       )}
     </div>

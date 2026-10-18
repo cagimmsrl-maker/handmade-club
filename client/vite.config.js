@@ -7,13 +7,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.png', 'icone/apple-touch-icon.png', 'brand/logo.png', 'brand/logo-chiaro.png'],
       manifest: {
         name: 'Handmade Club',
         short_name: 'Handmade Club',
         description: 'Tessera fedeltà digitale Handmade Café',
-        theme_color: '#2b2b2b',
-        background_color: '#ffffff',
+        theme_color: '#80321A',
+        background_color: '#FAF4EC',
         display: 'standalone',
         start_url: '/',
         scope: '/',
