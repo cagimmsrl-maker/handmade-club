@@ -24,7 +24,7 @@ set -euo pipefail
 REPO="/var/www/handmade-club"
 SERVER="$REPO/server"
 CLIENT="$REPO/client"
-DIST="$CLIENT/dist"          # servita da Express (server/index.js); nessun vhost nginx dedicato per ora
+DIST="$CLIENT/dist"          # servita da Express (server/index.js), nginx davanti su club.handmadecafe.it
 BACKUP_DIR="/root/backups/handmade-club"
 DB="handmade_clienti"
 DB_USER="hclub"

@@ -10,7 +10,9 @@ DB="handmade_clienti"
 DB_USER="hclub"
 PM2_APP="handmade-club"
 BACKEND_URL="http://127.0.0.1:3002/api/salute"
-FRONTEND_URL="http://127.0.0.1:3002/"   # client/dist servito da Express (nessun vhost nginx dedicato per ora)
+FRONTEND_URL="http://127.0.0.1:3002/"   # client/dist servito da Express, nginx fa da reverse proxy
+DOMAIN="club.handmadecafe.it"
+PUBLIC_URL="https://$DOMAIN"
 ERR=0
 ok()   { echo "  OK   $*"; }
 ko()   { echo "  KO   $*"; ERR=1; }
@@ -39,6 +41,19 @@ code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$BACKEND_URL" || ech
 # frontend
 code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$FRONTEND_URL" || echo 000)
 [ "$code" = "200" ] && ok "frontend: HTTP 200" || ko "frontend: HTTP $code su $FRONTEND_URL"
+
+# dominio pubblico (nginx + HTTPS davanti a Express)
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$PUBLIC_URL/api/salute" || echo 000)
+[ "$code" = "200" ] && ok "https: $PUBLIC_URL/api/salute HTTP 200" || ko "https: HTTP $code su $PUBLIC_URL/api/salute"
+redir=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 5 "http://$DOMAIN/" || echo 000)
+[ "$redir" = "301 $PUBLIC_URL/" ] && ok "http: redirect 301 a https" || ko "http: atteso 301 verso $PUBLIC_URL/, ottenuto '$redir'"
+scad=$(echo | openssl s_client -connect "$DOMAIN:443" -servername "$DOMAIN" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+if [ -z "$scad" ]; then ko "certificato: impossibile leggerlo"
+else
+  giorni=$(( ($(date -d "$scad" +%s) - $(date +%s)) / 86400 ))
+  [ "$giorni" -ge 15 ] && ok "certificato: scade tra $giorni giorni" || ko "certificato: scade tra $giorni giorni (rinnovo certbot fallito?)"
+fi
+
 dist_js=$(ls -1 "$REPO"/client/dist/assets/*.js 2>/dev/null | head -1)
 [ -n "$dist_js" ] && ok "frontend: dist del $(date -r "$dist_js" '+%F %H:%M')" || ko "frontend: client/dist/assets vuoto"
 

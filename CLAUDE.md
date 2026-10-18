@@ -15,7 +15,14 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
 - Backend: Node.js + Express
 - Database: PostgreSQL — database `handmade_clienti`, utente dedicato `hclub` (NON l'utente del gestionale)
 - Process manager: PM2, processo `handmade-club` su porta 3002
-- Reverse proxy: Nginx, sottodominio dedicato con HTTPS
+- Reverse proxy: Nginx su **https://club.handmadecafe.it** (dal 18/10/2026), config
+  `/etc/nginx/sites-available/club.handmadecafe.it.conf` → `proxy_pass http://127.0.0.1:3002` con
+  `Host`, `X-Forwarded-For`, `X-Forwarded-Proto`. Certificato Let's Encrypt via `certbot --nginx`
+  (rinnovo automatico), http → 301 https. Express ha `trust proxy 1`: il rate limiting vede l'IP reale.
+  **La porta 3002 resta chiusa all'esterno** (ufw apre solo 22/80/443): si entra solo da nginx.
+  Non aprirla e non esporre altre porte. In `server/.env` di produzione `COOKIE_SECURE=true`
+  (cookie di sessione `Secure`): il `.env` non è nel repo, si cambia a mano con backup e `pm2 restart --update-env`.
+  Le config nginx del sito (`handmadecafe.conf`) e del gestionale (`cagimm`) non vanno toccate.
 
 ## Regole di produzione (NON derogabili)
 
