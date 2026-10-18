@@ -2,3 +2,6 @@ node_modules/
 .env
 client/dist/
 *.log
+client/dist_new_*/
+client/dist_prev/
+client/dist_rollback/

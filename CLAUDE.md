@@ -22,8 +22,25 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
 1. **Migrazioni numerate.** Ogni modifica allo schema passa da un file `migrations/NNN_descrizione.sql`
    progressivo. Mai ALTER manuali fuori migrazione. Ogni migrazione registra sé stessa nella tabella
    `schema_migrations`.
-2. **Sequenza di deploy:** git push → esecuzione migrazione SQL (se presente) → `npm run build` frontend →
-   `pm2 restart handmade-club`. Sempre in quest'ordine.
+2. **Deploy automatico (regola aggiornata 18/10/2026).** Esiste la GitHub Action
+   `.github/workflows/deploy.yml`: ogni push su `main` lancia `./scripts/deploy.sh --pull` sul server.
+   Quindi il flusso è: **commit → (al "deploy" di Ciro) git push → la Action fa il deploy.**
+   Mai fare git push senza il "deploy" esplicito: il push È il deploy in produzione.
+   Lo script esegue la sequenza nell'ordine corretto e si ferma al primo errore:
+   backup DB → migrazioni pendenti (+ GRANT a `hclub`) → `pm2 restart handmade-club` →
+   build frontend in cartella temporanea → scambio atomico di `client/dist` → `check.sh`.
+       ./scripts/deploy.sh             # deploy manuale (emergenze / GitHub non raggiungibile)
+       ./scripts/deploy.sh --dry-run   # mostra cosa farebbe, non tocca nulla
+       ./scripts/check.sh              # solo verifiche, non tocca nulla
+       ./scripts/rollback.sh [--db]    # torna alla versione precedente
+   Backup e log di deploy in `/root/backups/handmade-club/`. Stato delle Action su
+   https://github.com/cagimmsrl-maker/handmade-club/actions.
+   **Mai `npm run build` nel repo:** `client/dist` è servita direttamente in produzione, quindi una build
+   nel repo pubblica all'istante il frontend. Per verificare che compili, buildare fuori dal repo:
+       cd client && npx vite build --outDir /tmp/verifica-build-hclub --emptyOutDir
+   Le migrazioni le applica solo deploy.sh (come `postgres` con `SET ROLE hclub`, così gli oggetti
+   restano di `hclub`); ogni file `NNN_*.sql` deve avere il suo BEGIN/COMMIT e l'INSERT in
+   `schema_migrations (versione, descrizione)` con versione = NNN.
 3. **Niente dati fittizi in produzione.** Nessun seed di clienti di prova nel DB di produzione.
    Per i test si usano numeri di telefono reali del titolare/staff.
 4. **Questo è un sistema pubblico esposto a Internet.** A differenza del gestionale (trust-based),
