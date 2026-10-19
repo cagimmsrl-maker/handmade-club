@@ -25,6 +25,14 @@ app.use('/api/admin', adminRoutes);
 
 app.get('/api/salute', (req, res) => res.json({ ok: true }));
 
+// Foto caricate dall'admin (promozioni). Nomi casuali e mai riusati, quindi
+// cache lunga e immutable: una foto nuova ha sempre un URL nuovo.
+const immagini = require('./services/immaginiService');
+immagini.assicuraCartelle().catch((err) => console.error(`[immagini] cartella uploads non creabile: ${err.message}`));
+app.use('/uploads', express.static(immagini.UPLOADS_DIR, {
+  index: false, dotfiles: 'deny', maxAge: '30d', immutable: true, fallthrough: false,
+}));
+
 // In produzione Nginx serve i file statici di client/dist direttamente;
 // questo blocco serve solo come comodo fallback per test locali senza Nginx.
 const distPath = path.join(__dirname, '..', 'client', 'dist');

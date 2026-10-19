@@ -9,6 +9,8 @@ const adminClientiController = require('../controllers/adminClientiController');
 const adminPromozioniController = require('../controllers/adminPromozioniController');
 const authAdmin = require('../middleware/authAdmin');
 const validate = require('../middleware/validate');
+const multer = require('multer');
+const { MAX_BYTE } = require('../services/immaginiService');
 const { limitatorePubblico } = require('../middleware/rateLimiters');
 const {
   loginSchema,
@@ -54,6 +56,20 @@ router.put('/promozioni/:id', validate(promozioneSchema), adminPromozioniControl
 router.post('/promozioni/:id/pubblica', adminPromozioniController.pubblica);
 router.post('/promozioni/:id/archivia', adminPromozioniController.archivia);
 router.delete('/promozioni/:id', adminPromozioniController.elimina);
+
+// Foto promozione: un solo file, in memoria (poi immaginiService lo scrive
+// con un nome suo). Gli errori di multer (peso, campo sbagliato) diventano
+// risposte 400/413 leggibili invece di un 500.
+const uploadImmagine = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BYTE, files: 1, fields: 0 } });
+function conImmagine(req, res, next) {
+  uploadImmagine.single('immagine')(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ errore: 'Immagine troppo pesante (massimo 950 KB).' });
+    return res.status(400).json({ errore: 'Caricamento non valido: invia una sola immagine nel campo "immagine".' });
+  });
+}
+router.post('/promozioni/:id/immagine', conImmagine, adminPromozioniController.caricaImmagine);
+router.delete('/promozioni/:id/immagine', adminPromozioniController.rimuoviImmagine);
 
 router.get('/clienti', adminClientiController.elenco);
 router.post('/clienti/:id/blocca-tessera', adminClientiController.bloccaTessera);

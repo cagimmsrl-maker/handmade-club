@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api.js'
 import { etichettaTipo, etichettaValidita } from '../../lib/promo.js'
+import { ridimensionaImmagine } from '../../lib/immagini.js'
 
 const TIPI = [
   { valore: 'sconto_percentuale', etichetta: 'Sconto % sullo scontrino' },
@@ -33,6 +34,41 @@ export default function Promozioni() {
   const [form, setForm] = useState(VUOTO)
   const [errore, setErrore] = useState('')
   const [ok, setOk] = useState('')
+  const [salvataggio, setSalvataggio] = useState(false)
+  // Foto: quella già salvata (URL), la nuova scelta (blob ridotto + anteprima)
+  // e la richiesta di toglierla. L'upload parte dopo il salvataggio dei dati.
+  const [fotoAttuale, setFotoAttuale] = useState(null)
+  const [fotoNuova, setFotoNuova] = useState(null)
+  const [fotoAnteprima, setFotoAnteprima] = useState(null)
+  const [fotoDaRimuovere, setFotoDaRimuovere] = useState(false)
+  const [fotoInElaborazione, setFotoInElaborazione] = useState(false)
+
+  function azzeraFoto(url = null) {
+    if (fotoAnteprima) URL.revokeObjectURL(fotoAnteprima)
+    setFotoAttuale(url); setFotoNuova(null); setFotoAnteprima(null); setFotoDaRimuovere(false)
+  }
+
+  async function scegliFoto(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setErrore(''); setFotoInElaborazione(true)
+    try {
+      const blob = await ridimensionaImmagine(file)
+      if (fotoAnteprima) URL.revokeObjectURL(fotoAnteprima)
+      setFotoNuova(blob); setFotoAnteprima(URL.createObjectURL(blob)); setFotoDaRimuovere(false)
+    } catch (err) {
+      setErrore(err.message)
+    } finally {
+      setFotoInElaborazione(false)
+    }
+  }
+
+  function togliFoto() {
+    if (fotoAnteprima) URL.revokeObjectURL(fotoAnteprima)
+    setFotoNuova(null); setFotoAnteprima(null)
+    if (fotoAttuale) setFotoDaRimuovere(true)
+  }
 
   function carica() {
     api.get('/admin/promozioni').then(setLista).catch((e) => setErrore(e.message))
@@ -44,7 +80,7 @@ export default function Promozioni() {
   }, [])
 
   function apriNuova() {
-    setForm(VUOTO); setEditId('nuova'); setErrore(''); setOk('')
+    setForm(VUOTO); setEditId('nuova'); setErrore(''); setOk(''); azzeraFoto(null)
   }
   function apriModifica(p) {
     setForm({
@@ -56,7 +92,7 @@ export default function Promozioni() {
       targetLivelloId: p.targetLivelloId ?? '', targetSedeId: p.targetSedeId ?? '',
       usiPerCliente: p.usiPerCliente ?? 1, usiIllimitati: p.usiPerCliente == null,
     })
-    setEditId(p.id); setErrore(''); setOk('')
+    setEditId(p.id); setErrore(''); setOk(''); azzeraFoto(p.immagine ?? null)
   }
 
   function payload() {
@@ -79,17 +115,30 @@ export default function Promozioni() {
 
   async function salva(e, poiPubblica = false) {
     e.preventDefault()
-    setErrore(''); setOk('')
+    setErrore(''); setOk(''); setSalvataggio(true)
+    let id = editId
     try {
-      let id = editId
       if (editId === 'nuova') ({ id } = await api.post('/admin/promozioni', payload()))
       else await api.put(`/admin/promozioni/${editId}`, payload())
-      if (poiPubblica) await api.post(`/admin/promozioni/${id}/pubblica`)
-      setEditId(null)
-      setOk(poiPubblica ? 'Promozione pubblicata: da ora è in bacheca.' : 'Salvata come bozza.')
-      carica()
     } catch (err) {
+      setSalvataggio(false)
       setErrore(err.dettagli?.length ? `${err.message} ${err.dettagli.map((d) => d.messaggio).join('; ')}` : err.message)
+      return
+    }
+    // Dati salvati: ora la foto. Se fallisce, la promo resta (come bozza o
+    // pubblicata) e si riapre in modifica per riprovare solo la foto.
+    try {
+      if (fotoNuova) await api.upload(`/admin/promozioni/${id}/immagine`, 'immagine', fotoNuova)
+      else if (fotoDaRimuovere) await api.delete(`/admin/promozioni/${id}/immagine`)
+      if (poiPubblica) await api.post(`/admin/promozioni/${id}/pubblica`)
+      setEditId(null); azzeraFoto(null)
+      setOk(poiPubblica ? 'Promozione pubblicata: da ora è in bacheca.' : 'Salvata come bozza.')
+    } catch (err) {
+      if (editId === 'nuova') setEditId(id)
+      setErrore(`Dati salvati, ma la foto no: ${err.message}`)
+    } finally {
+      setSalvataggio(false)
+      carica()
     }
   }
 
@@ -133,7 +182,7 @@ export default function Promozioni() {
           <tbody>
             {lista.map((p) => (
               <tr key={p.id} style={{ opacity: p.stato === 'archiviata' ? 0.55 : 1 }}>
-                <td><strong>{p.titolo}</strong></td>
+                <td>{p.immagine && <img className="miniatura-foto" src={p.immagine} alt="" />}<strong>{p.titolo}</strong></td>
                 <td>{etichettaTipo(p) ?? 'Messaggio'}</td>
                 <td>{etichettaValidita(p)}</td>
                 <td>{[p.livelloNome && `livello ${p.livelloNome}`, p.sedeNome].filter(Boolean).join(', ') || 'tutti'}</td>
@@ -184,6 +233,26 @@ export default function Promozioni() {
           <div className="campo">
             <label htmlFor="descrizione">Descrizione (facoltativa, la legge il cliente)</label>
             <input id="descrizione" value={form.descrizione} onChange={(e) => setForm({ ...form, descrizione: e.target.value })} maxLength={1000} />
+          </div>
+
+          <div className="campo">
+            <label htmlFor="foto">Foto (facoltativa, in alto nella scheda che vede il cliente)</label>
+            {(fotoAnteprima || (fotoAttuale && !fotoDaRimuovere)) && (
+              <img className="anteprima-foto" src={fotoAnteprima || fotoAttuale} alt="Anteprima foto" />
+            )}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+              <label className="btn btn-secondario" style={{ cursor: 'pointer', margin: 0 }}>
+                {fotoInElaborazione ? 'Elaboro…' : (fotoAnteprima || (fotoAttuale && !fotoDaRimuovere) ? 'Cambia foto' : 'Scegli foto')}
+                <input id="foto" type="file" accept="image/*" onChange={scegliFoto} disabled={fotoInElaborazione} style={{ display: 'none' }} />
+              </label>
+              {(fotoAnteprima || (fotoAttuale && !fotoDaRimuovere)) && (
+                <button type="button" className="link-testo" onClick={togliFoto}>Togli foto</button>
+              )}
+              {fotoDaRimuovere && <span className="testo-secondario">La foto verrà tolta al salvataggio.</span>}
+            </div>
+            <p className="testo-secondario" style={{ margin: '6px 0 0', fontSize: '0.85rem' }}>
+              Meglio orizzontale (16:9). Viene ridotta automaticamente prima dell'invio.
+            </p>
           </div>
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -249,11 +318,11 @@ export default function Promozioni() {
           )}
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-            <button className="btn btn-primario" type="button" onClick={(e) => salva(e, true)}>
-              {editId === 'nuova' ? 'Salva e pubblica' : 'Salva e pubblica'}
+            <button className="btn btn-primario" type="button" disabled={salvataggio || fotoInElaborazione} onClick={(e) => salva(e, true)}>
+              {salvataggio ? 'Salvo…' : 'Salva e pubblica'}
             </button>
-            <button className="btn btn-secondario" type="submit">Salva come bozza</button>
-            <button className="btn btn-secondario" type="button" onClick={() => setEditId(null)}>Annulla</button>
+            <button className="btn btn-secondario" type="submit" disabled={salvataggio || fotoInElaborazione}>Salva come bozza</button>
+            <button className="btn btn-secondario" type="button" onClick={() => { setEditId(null); azzeraFoto(null) }}>Annulla</button>
           </div>
         </form>
       )}

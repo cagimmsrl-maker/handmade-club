@@ -5,6 +5,7 @@
 
 const pool = require('../db/pool');
 const crypto = require('crypto');
+const immagini = require('./immaginiService');
 
 const TIPI = ['sconto_percentuale', 'prezzo_fisso', 'omaggio', 'messaggio'];
 
@@ -12,7 +13,7 @@ const COLONNE = `
   p.id, p.titolo, p.descrizione, p.tipo, p.valore, p.prodotto,
   p.valido_dal, p.valido_al, p.ora_inizio, p.ora_fine, p.giorni_settimana,
   p.target_livello_id, p.target_sede_id, p.usi_per_cliente,
-  p.stato, p.pubblicata_il, p.created_at
+  p.stato, p.pubblicata_il, p.created_at, p.immagine
 `;
 
 // Codice QR statico per una tessera: 12 esadecimali maiuscoli (48 bit).
@@ -189,10 +190,30 @@ async function cambiaStato(id, stato) {
 async function eliminaAdmin(id) {
   // Si elimina solo una bozza mai pubblicata; il resto si archivia, per
   // non perdere la storia di caricamenti e utilizzi.
-  const { rowCount } = await pool.query(
-    `DELETE FROM promozioni WHERE id = $1 AND stato = 'bozza' AND pubblicata_il IS NULL`, [id]
+  const { rows } = await pool.query(
+    `DELETE FROM promozioni WHERE id = $1 AND stato = 'bozza' AND pubblicata_il IS NULL RETURNING immagine`, [id]
   );
-  return rowCount > 0;
+  if (rows.length === 0) return false;
+  await immagini.eliminaImmaginePromozione(rows[0].immagine);
+  return true;
+}
+
+// Foto della promozione. Il file è già stato salvato su disco dal
+// controller; qui si aggiorna il riferimento e si cancella la foto
+// precedente, se c'era. nome = null toglie la foto.
+async function impostaImmagine(id, nome) {
+  const { rows } = await pool.query(
+    `UPDATE promozioni p SET immagine = $2, updated_at = now()
+       FROM (SELECT immagine FROM promozioni WHERE id = $1 FOR UPDATE) prima
+      WHERE p.id = $1 AND p.stato <> 'archiviata'
+      RETURNING prima.immagine AS precedente`,
+    [id, nome]
+  );
+  if (rows.length === 0) return false;
+  if (rows[0].precedente && rows[0].precedente !== nome) {
+    await immagini.eliminaImmaginePromozione(rows[0].precedente);
+  }
+  return true;
 }
 
 function serializza(r) {
@@ -213,6 +234,7 @@ function serializza(r) {
     livelloNome: r.livello_nome ?? null,
     sedeNome: r.sede_nome ?? null,
     usiPerCliente: r.usi_per_cliente,
+    immagine: immagini.urlImmaginePromozione(r.immagine),
     stato: r.stato,
     pubblicataIl: r.pubblicata_il,
     caricataIl: r.caricata_il ?? null,
@@ -226,5 +248,5 @@ function serializza(r) {
 module.exports = {
   TIPI, generaCodiceQr, validaOra,
   bachecaPerCliente, carica, caricateUtilizzabili, segnaUsata,
-  listaAdmin, creaAdmin, aggiornaAdmin, cambiaStato, eliminaAdmin,
+  listaAdmin, creaAdmin, aggiornaAdmin, cambiaStato, eliminaAdmin, impostaImmagine,
 };

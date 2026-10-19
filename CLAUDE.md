@@ -121,6 +121,15 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   ricontrolla tutto: mai fidarsi di ciò che l'operatore ha a schermo.
 - La regola di validità è UNA sola (`promozioniService.validaOra`) e usa l'ora locale del server
   (quella dei locali). Non duplicarla nel frontend: il client mostra, il server decide.
+- **Foto della promozione (migrazione 005).** `promozioni.immagine` contiene solo il nome file
+  (casuale, generato dal server); il file sta in `uploads/promozioni/` nella root del repo
+  (ignorata da git, quindi sopravvive ai deploy; `UPLOADS_DIR` nel `.env` per spostarla) ed è
+  servito da Express su `/uploads` con cache immutable. Upload: `POST /admin/promozioni/:id/immagine`
+  (multipart, campo `immagine`, multer in memoria, tipo riconosciuto dai magic bytes, max 950 KB);
+  `DELETE` per toglierla. Il limite sta sotto 1 MB perché nginx ha `client_max_body_size` di default:
+  è il client che ridimensiona la foto prima dell'invio (`client/src/lib/immagini.js`, 1280 px JPEG).
+  **La cartella uploads NON è nel backup di deploy.sh** (che salva solo il DB): va inclusa nei backup
+  del server.
 - Le notifiche push per avvisare i clienti delle promo arrivano in una fase successiva (richiedono
   HTTPS su dominio pubblico).
 

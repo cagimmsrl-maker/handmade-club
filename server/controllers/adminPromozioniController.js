@@ -1,4 +1,5 @@
 const promozioniService = require('../services/promozioniService');
+const immagini = require('../services/immaginiService');
 
 async function lista(req, res, next) {
   try {
@@ -61,4 +62,32 @@ async function elimina(req, res, next) {
   }
 }
 
-module.exports = { lista, crea, aggiorna, pubblica, archivia, elimina };
+// Foto: multipart con campo "immagine" (multer la mette in req.file). Si
+// salva prima il file, poi il riferimento; se la promo non esiste o è
+// archiviata il file appena scritto viene tolto.
+async function caricaImmagine(req, res, next) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const nome = await immagini.salvaImmaginePromozione(req.file?.buffer);
+    const ok = await promozioniService.impostaImmagine(id, nome);
+    if (!ok) {
+      await immagini.eliminaImmaginePromozione(nome);
+      return res.status(404).json({ errore: 'Promozione non trovata o archiviata.' });
+    }
+    res.json({ ok: true, immagine: immagini.urlImmaginePromozione(nome) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function rimuoviImmagine(req, res, next) {
+  try {
+    const ok = await promozioniService.impostaImmagine(parseInt(req.params.id, 10), null);
+    if (!ok) return res.status(404).json({ errore: 'Promozione non trovata o archiviata.' });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { lista, crea, aggiorna, pubblica, archivia, elimina, caricaImmagine, rimuoviImmagine };

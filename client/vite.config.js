@@ -7,6 +7,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Il service worker non deve rispondere con index.html alle richieste
+      // di API e foto aperte direttamente (es. /uploads/promozioni/x.jpg).
+      workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//] },
       includeAssets: ['favicon.png', 'icone/apple-touch-icon.png', 'brand/logo.png', 'brand/logo-chiaro.png'],
       manifest: {
         name: 'Handmade Club',
@@ -28,6 +31,10 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+      '/uploads': {
         target: 'http://localhost:3002',
         changeOrigin: true,
       },

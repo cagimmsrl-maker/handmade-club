@@ -9,11 +9,14 @@ class ErroreApi extends Error {
 }
 
 async function richiesta(metodo, percorso, corpo) {
+  // Un FormData (upload di file) va mandato così com'è: il browser mette
+  // da solo il Content-Type multipart con il boundary.
+  const multipart = typeof FormData !== 'undefined' && corpo instanceof FormData;
   const risposta = await fetch(`${BASE}${percorso}`, {
     method: metodo,
     credentials: 'include',
-    headers: corpo !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: corpo !== undefined ? JSON.stringify(corpo) : undefined,
+    headers: corpo !== undefined && !multipart ? { 'Content-Type': 'application/json' } : undefined,
+    body: corpo === undefined ? undefined : (multipart ? corpo : JSON.stringify(corpo)),
   });
 
   const testo = await risposta.text();
@@ -30,6 +33,12 @@ export const api = {
   post: (percorso, corpo) => richiesta('POST', percorso, corpo ?? {}),
   put: (percorso, corpo) => richiesta('PUT', percorso, corpo ?? {}),
   delete: (percorso) => richiesta('DELETE', percorso),
+  // Upload di un file: `campo` è il nome del campo multipart atteso dal server.
+  upload: (percorso, campo, blob, nomeFile = 'foto.jpg') => {
+    const fd = new FormData()
+    fd.append(campo, blob, nomeFile)
+    return richiesta('POST', percorso, fd)
+  },
 };
 
 export { ErroreApi };

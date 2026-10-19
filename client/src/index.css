@@ -141,6 +141,37 @@ h2 { font-size: 1.15rem; }
 }
 
 /* Scorciatoia promo nella home */
+/* Foto di una promozione: sborda il padding della card e occupa tutta la larghezza. */
+.card-con-foto { padding-top: 0; }
+.promo-foto {
+  display: block;
+  width: calc(100% + 40px);
+  margin: 0 -20px 14px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--raggio) var(--raggio) 0 0;
+  background: var(--crema-scura);
+}
+
+.anteprima-foto {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--colore-bordo);
+  background: var(--crema-scura);
+}
+.miniatura-foto {
+  width: 56px; height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  vertical-align: middle;
+  margin-right: 8px;
+  background: var(--crema-scura);
+}
+
 .card-link {
   display: flex;
   align-items: center;
