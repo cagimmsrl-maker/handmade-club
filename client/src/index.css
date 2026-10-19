@@ -408,6 +408,30 @@ table.tabella-admin th, table.tabella-admin td {
 }
 
 /* Banner "aggiungi alla Home" */
+/* Pagina /installa (atterraggio del QR): tutto grande, da leggere al banco. */
+.installa { text-align: center; }
+.installa h1 { font-size: 1.45rem; margin: 18px 0 8px; }
+.installa-testo { color: var(--colore-testo-secondario); margin: 0 0 18px; line-height: 1.5; }
+.installa-icona {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 8px;
+  font-weight: 700; font-size: 0.85rem;
+}
+.installa-icona img { border-radius: 20px; box-shadow: 0 6px 18px rgba(30, 26, 23, 0.22); }
+.installa-grande { font-size: 1.15rem; padding: 16px 22px; margin-bottom: 14px; display: block; width: 100%; text-decoration: none; box-sizing: border-box; }
+.installa-passi { list-style: none; padding: 0; margin: 0 0 18px; text-align: left; }
+.installa-passi li {
+  display: flex; gap: 14px; align-items: center;
+  background: var(--colore-superficie); border: 1px solid var(--colore-bordo);
+  border-radius: 14px; padding: 14px; margin-bottom: 10px; font-size: 1.05rem; line-height: 1.4;
+}
+.installa-numero {
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--terracotta); color: #fff; font-weight: 700;
+  display: grid; place-items: center;
+}
+.installa .ios-icona { font-size: 1.15rem; color: #0a7aff; }
+.installa .link-testo { display: block; margin: 8px auto 0; }
+
 .card.banner-installa {
   background: var(--crema);
   border-color: #EBD9C3;

@@ -1,56 +1,39 @@
 import { useEffect, useState } from 'react'
+import { osservaInstallazione, mostraPromptInstallazione, giaInstallata, isIos, isSafari } from '../lib/installa.js'
 
 // Invito a mettere l'app sulla schermata Home. Nessun sito può installarsi
 // da solo: su Android/Chrome il browser ci dà l'evento beforeinstallprompt
-// e possiamo offrire un pulsante "Installa" (un tocco); su iPhone/Safari
-// Apple non lo permette, quindi mostriamo la guida in due passi. Il banner
-// sparisce se l'app è già installata (display-mode standalone) o se il
-// cliente lo chiude (ricordato in localStorage, best effort).
+// (catturato in lib/installa.js) e possiamo offrire un pulsante "Installa"
+// (un tocco); su iPhone/Safari Apple non lo permette, quindi mostriamo la
+// guida in due passi. Il banner sparisce se l'app è già installata
+// (display-mode standalone) o se il cliente lo chiude (ricordato in
+// localStorage, best effort).
 
 const CHIAVE_CHIUSO = 'hc_installa_chiuso'
 
-function giaInstallata() {
-  try {
-    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
-  } catch { return false }
-}
 function chiusoDiRecente() {
   try {
     const t = Number(window.localStorage.getItem(CHIAVE_CHIUSO) || 0)
     return t && Date.now() - t < 7 * 24 * 60 * 60 * 1000
   } catch { return false }
 }
-function isIos() {
-  const ua = window.navigator.userAgent
-  return /iPhone|iPad|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document)
-}
-function isSafari() {
-  const ua = window.navigator.userAgent
-  return /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)
-}
 
 export default function BannerInstalla() {
-  const [promptEvento, setPromptEvento] = useState(null)
+  const [haPrompt, setHaPrompt] = useState(false)
   const [visibile, setVisibile] = useState(false)
   const [modo, setModo] = useState(null) // 'android' | 'ios' | 'ios-altro-browser'
 
   useEffect(() => {
     if (giaInstallata() || chiusoDiRecente()) return
-
-    function onPrompt(e) {
-      e.preventDefault()
-      setPromptEvento(e)
-      setModo('android')
-      setVisibile(true)
-    }
-    window.addEventListener('beforeinstallprompt', onPrompt)
-    window.addEventListener('appinstalled', () => setVisibile(false))
-
+    const stop = osservaInstallazione((p, installata) => {
+      if (installata) { setVisibile(false); return }
+      setHaPrompt(true); setModo('android'); setVisibile(true)
+    })
     if (isIos()) {
       setModo(isSafari() ? 'ios' : 'ios-altro-browser')
       setVisibile(true)
     }
-    return () => window.removeEventListener('beforeinstallprompt', onPrompt)
+    return stop
   }, [])
 
   function chiudi() {
@@ -59,11 +42,10 @@ export default function BannerInstalla() {
   }
 
   async function installa() {
-    if (!promptEvento) return
-    promptEvento.prompt()
-    const { outcome } = await promptEvento.userChoice
-    if (outcome === 'accepted') setVisibile(false)
-    setPromptEvento(null)
+    if (!haPrompt) return
+    const esito = await mostraPromptInstallazione()
+    if (esito === 'accepted') setVisibile(false)
+    setHaPrompt(false)
   }
 
   if (!visibile || !modo) return null

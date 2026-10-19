@@ -92,6 +92,20 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   la verifica funziona solo leggendo il codice dai log PM2: va attivato Skebby prima di aprire
   l'app ai clienti. Nei log il numero è sempre mascherato.
 
+## Installazione sulla Home (PWA)
+
+- Nessun sito può creare da solo un'icona nella Home: su Android/Chrome il browser emette
+  `beforeinstallprompt` e si può offrire un pulsante "Installa" (un tocco); su iPhone solo l'utente
+  con Condividi → "Aggiungi alla schermata Home" (nessuno script/profilo/APK lo sostituisce).
+  L'evento Android si cattura in `client/src/lib/installa.js` **prima** del render (main.jsx) perché
+  arriva una volta sola.
+- **`/installa`** è la pagina di atterraggio del QR stampato al banco (`/home/claude/club-qr`,
+  URL `https://club.handmadecafe.it/installa`): riconosce il telefono e mostra Installa (Android) o la
+  guida in 3 passi (iPhone), POI manda alla registrazione. L'ordine conta su iPhone: l'app aggiunta
+  alla Home non condivide i cookie con Safari, quindi il cliente deve creare la tessera dentro l'app
+  installata, altrimenti si ritrova a fare il login con codice SMS.
+- Tessera in Apple/Google Wallet: in agenda (serve l'account sviluppatore Apple).
+
 ## Logica di dominio — Livelli e convenzioni
 
 - I **livelli** (es. Standard, Oro, Platinum) sono DINAMICI: si calcolano dal numero di scansioni
