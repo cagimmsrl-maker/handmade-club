@@ -19,6 +19,8 @@ router.post('/verifica/conferma', limitatorePubblico(), validate(confermaVerific
 router.put('/profilo', validate(profiloSchema), clienteController.aggiornaProfilo);
 router.post('/convenzione', validate(convenzioneSchema), clienteController.attivaConvenzione);
 router.delete('/consenso-marketing', clienteController.revocaConsensoMarketing);
+router.post('/consenso-marketing', clienteController.prestaConsensoMarketing);
+router.get('/esporta-dati', clienteController.esportaDati);
 router.post('/cancella-account', clienteController.cancellaAccount);
 
 module.exports = router;

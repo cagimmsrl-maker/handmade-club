@@ -71,6 +71,15 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
    `tessere.codice` (HC-000042) non va MAI usato come QR: è sequenziale e indovinabile.
 7. **GDPR by design.** Consensi tracciati con timestamp in colonne dedicate. Consenso marketing
    SEPARATO e facoltativo. Endpoint di cancellazione account self-service (soft delete + anonimizzazione).
+   Dal 21/10/2026 (migrazione 006): informativa pubblica su `/privacy` (testo in
+   `client/src/lib/informativa.js`, UN solo posto), linkata dalla casella di consenso e dal profilo;
+   `clienti.informativa_versione` salva la versione accettata (`server/config/privacy.js`,
+   `INFORMATIVA_VERSIONE` = data del testo: **aggiornarla insieme al testo**); consenso marketing
+   attivabile/revocabile dal profilo (`POST`/`DELETE /cliente/consenso-marketing`, revoca tracciata in
+   `consenso_marketing_revocato_il`); "Scarica i miei dati" (`GET /cliente/esporta-dati`, JSON);
+   `pulizieService` anonimizza ogni giorno i clienti senza attività da 24 mesi, come promesso
+   nell'informativa — se cambia la promessa, cambiare `MESI_INATTIVITA`. Email privacy:
+   privacy@handmadecafe.it. Nessun DPO nominato (non obbligatorio per questa scala).
 8. **Lingua.** Tutta l'interfaccia utente in italiano.
 
 ## Accesso cliente — "entri subito, verifichi dopo" (migrazione 004, dal 18/10/2026)

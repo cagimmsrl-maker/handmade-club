@@ -3,11 +3,13 @@ const jwtService = require('../services/jwtService');
 const livelloService = require('../services/livelloService');
 const promozioniService = require('../services/promozioniService');
 const otpService = require('../services/otpService');
+const { INFORMATIVA_VERSIONE, TITOLARE } = require('../config/privacy');
 
 async function me(req, res, next) {
   try {
     const { rows } = await pool.query(
       `SELECT c.nome, c.cognome, c.email, c.data_nascita, c.consenso_marketing_il, c.telefono, c.telefono_verificato,
+              c.informativa_versione, c.consenso_servizio_il,
               l.nome AS livello_nome, l.colore AS livello_colore, l.sconto_percentuale AS livello_sconto,
               conv.nome AS convenzione_nome, conv.sconto_percentuale AS convenzione_sconto,
               t.codice AS tessera_codice, t.codice_qr AS tessera_codice_qr
@@ -35,6 +37,9 @@ async function me(req, res, next) {
       email: r.email,
       dataNascita: r.data_nascita,
       consensoMarketing: !!r.consenso_marketing_il,
+      informativaVersione: r.informativa_versione,
+      informativaCorrente: INFORMATIVA_VERSIONE,
+      consensoServizioIl: r.consenso_servizio_il,
       telefono: r.telefono,
       telefonoVerificato: !!r.telefono_verificato,
       // codiceQr: contenuto del QR statico (vedi migrazione 003). Il
@@ -162,8 +167,85 @@ async function attivaConvenzione(req, res, next) {
 
 async function revocaConsensoMarketing(req, res, next) {
   try {
-    await pool.query('UPDATE clienti SET consenso_marketing_il = NULL WHERE id = $1', [req.clienteId]);
+    await pool.query(
+      `UPDATE clienti SET consenso_marketing_il = NULL, consenso_marketing_revocato_il = now()
+        WHERE id = $1 AND consenso_marketing_il IS NOT NULL`,
+      [req.clienteId]
+    );
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Il consenso marketing si può dare anche dopo la registrazione, dal
+// profilo. Un nuovo consenso azzera l'eventuale revoca precedente.
+async function prestaConsensoMarketing(req, res, next) {
+  try {
+    await pool.query(
+      `UPDATE clienti SET consenso_marketing_il = now(), consenso_marketing_revocato_il = NULL
+        WHERE id = $1 AND consenso_marketing_il IS NULL`,
+      [req.clienteId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Diritto di accesso e portabilità (art. 15 e 20 GDPR): tutto ciò che
+// abbiamo sul cliente, in un file JSON leggibile. Niente dati di altri
+// clienti, niente identificativi interni inutili.
+async function esportaDati(req, res, next) {
+  try {
+    const id = req.clienteId;
+    const { rows: [c] } = await pool.query(
+      `SELECT c.nome, c.cognome, c.email, c.telefono, c.telefono_verificato, c.data_nascita, c.created_at,
+              c.consenso_servizio_il, c.informativa_versione, c.consenso_marketing_il, c.consenso_marketing_revocato_il,
+              l.nome AS livello, conv.nome AS convenzione,
+              t.codice AS tessera_codice, t.codice_qr AS tessera_codice_qr, t.attivata_il AS tessera_attivata_il
+         FROM clienti c
+         LEFT JOIN livelli l ON l.id = c.livello_id
+         LEFT JOIN convenzioni conv ON conv.id = c.convenzione_id
+         LEFT JOIN tessere t ON t.cliente_id = c.id AND t.stato = 'attiva'
+        WHERE c.id = $1 AND c.stato = 'attivo'`,
+      [id]
+    );
+    if (!c) return res.status(404).json({ errore: 'Cliente non trovato.' });
+    const { rows: visite } = await pool.query(
+      `SELECT s.created_at AS data, sd.nome AS sede, l.nome AS livello
+         FROM scansioni s JOIN sedi sd ON sd.id = s.sede_id LEFT JOIN livelli l ON l.id = s.livello_id
+        WHERE s.cliente_id = $1 ORDER BY s.created_at`,
+      [id]
+    );
+    const { rows: promo } = await pool.query(
+      `SELECT p.titolo, pc.caricata_il,
+              (SELECT json_agg(json_build_object('data', u.usata_il, 'sede', sd.nome) ORDER BY u.usata_il)
+                 FROM promozioni_utilizzi u JOIN sedi sd ON sd.id = u.sede_id
+                WHERE u.promozione_id = p.id AND u.cliente_id = $1) AS utilizzi
+         FROM promozioni_clienti pc JOIN promozioni p ON p.id = pc.promozione_id
+        WHERE pc.cliente_id = $1 ORDER BY pc.caricata_il`,
+      [id]
+    );
+    const dati = {
+      esportatoIl: new Date().toISOString(),
+      titolare: { ...TITOLARE },
+      anagrafica: {
+        nome: c.nome, cognome: c.cognome, email: c.email, telefono: c.telefono,
+        telefonoVerificato: c.telefono_verificato, dataNascita: c.data_nascita, iscrittoIl: c.created_at,
+      },
+      consensi: {
+        informativaAccettataIl: c.consenso_servizio_il,
+        informativaVersione: c.informativa_versione,
+        marketing: c.consenso_marketing_il ? { prestatoIl: c.consenso_marketing_il } : { prestato: false, revocatoIl: c.consenso_marketing_revocato_il },
+      },
+      tessera: { codice: c.tessera_codice, codiceQr: c.tessera_codice_qr, attivataIl: c.tessera_attivata_il, livello: c.livello, convenzione: c.convenzione },
+      visite,
+      promozioni: promo.map((p) => ({ titolo: p.titolo, caricataIl: p.caricata_il, utilizzi: p.utilizzi || [] })),
+    };
+    res.setHeader('Content-Disposition', `attachment; filename="handmade-club-dati-${c.tessera_codice || id}.json"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(dati);
   } catch (err) {
     next(err);
   }
@@ -186,4 +268,7 @@ async function cancellaAccount(req, res, next) {
   }
 }
 
-module.exports = { me, qrToken, promozioni, caricaPromozione, richiediVerifica, confermaVerifica, aggiornaProfilo, attivaConvenzione, revocaConsensoMarketing, cancellaAccount };
+module.exports = {
+  me, qrToken, promozioni, caricaPromozione, richiediVerifica, confermaVerifica, aggiornaProfilo, attivaConvenzione,
+  revocaConsensoMarketing, prestaConsensoMarketing, esportaDati, cancellaAccount,
+};

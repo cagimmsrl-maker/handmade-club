@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../../api.js'
 
 // Ingresso: "entri subito, verifichi dopo". La tessera si crea con nome e
@@ -133,11 +134,11 @@ export default function Onboarding({ onCompletato }) {
       </div>
       <div className="campo-checkbox">
         <input id="informativa" type="checkbox" checked={accettaInformativa} onChange={(e) => setAccettaInformativa(e.target.checked)} required />
-        <label htmlFor="informativa">Ho letto e accetto l’informativa privacy sul trattamento dei miei dati. *</label>
+        <label htmlFor="informativa">Ho letto e accetto l’<Link to="/privacy">informativa privacy</Link> sul trattamento dei miei dati. *</label>
       </div>
       <div className="campo-checkbox">
         <input id="marketing" type="checkbox" checked={consensoMarketing} onChange={(e) => setConsensoMarketing(e.target.checked)} />
-        <label htmlFor="marketing">Voglio ricevere promozioni e novità (facoltativo).</label>
+        <label htmlFor="marketing">Voglio ricevere promozioni e novità via SMS, notifiche o email (facoltativo, lo puoi togliere quando vuoi dal profilo).</label>
       </div>
     </>
   )

@@ -45,6 +45,9 @@ app.get(/^(?!\/api\/).*/, (req, res, next) => {
 
 app.use(errorHandler);
 
+// Conservazione dati: anonimizza i clienti inattivi da 24 mesi (informativa).
+require('./services/pulizieService').avviaPulizieGiornaliere();
+
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
   console.log(`Handmade Club backend in ascolto sulla porta ${PORT}`);

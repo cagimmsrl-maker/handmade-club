@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../../api.js'
 import Testata from '../../components/Testata.jsx'
 import VerificaNumero from '../../components/VerificaNumero.jsx'
@@ -16,6 +17,8 @@ export default function Profilo({ onAccountCancellato }) {
   const [erroreProfilo, setErroreProfilo] = useState('')
   const [erroreConvenzione, setErroreConvenzione] = useState('')
   const [verificaAperta, setVerificaAperta] = useState(false)
+  const [messaggioPrivacy, setMessaggioPrivacy] = useState('')
+  const [esportazione, setEsportazione] = useState(false)
 
   function carica() {
     api.get('/cliente/me').then((d) => {
@@ -60,9 +63,40 @@ export default function Profilo({ onAccountCancellato }) {
     }
   }
 
-  async function revocaMarketing() {
-    await api.delete('/cliente/consenso-marketing')
-    carica()
+  async function cambiaMarketing(valore) {
+    setMessaggioPrivacy('')
+    try {
+      if (valore) await api.post('/cliente/consenso-marketing')
+      else await api.delete('/cliente/consenso-marketing')
+      setMessaggioPrivacy(valore ? 'Consenso registrato.' : 'Consenso revocato: non riceverai più promozioni.')
+      carica()
+    } catch (err) {
+      setMessaggioPrivacy(err.message)
+    }
+  }
+
+  // Diritto di accesso/portabilità: il server risponde con un file JSON;
+  // qui lo si scarica come farebbe un link, ma con il cookie di sessione.
+  async function scaricaDati() {
+    setEsportazione(true)
+    setMessaggioPrivacy('')
+    try {
+      const r = await fetch('/api/cliente/esporta-dati', { credentials: 'include' })
+      if (!r.ok) throw new Error('Esportazione non riuscita, riprova.')
+      const blob = await r.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `handmade-club-dati-${dati.tessera?.codice || 'tessera'}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) {
+      setMessaggioPrivacy(err.message)
+    } finally {
+      setEsportazione(false)
+    }
   }
 
   async function cancellaAccount() {
@@ -145,14 +179,25 @@ export default function Profilo({ onAccountCancellato }) {
 
       <div className="card">
         <h2>Privacy</h2>
-        <p className="testo-secondario">
-          Consenso marketing: {dati.consensoMarketing ? 'prestato' : 'non prestato'}
+        <label className="campo-interruttore">
+          <input type="checkbox" checked={dati.consensoMarketing} onChange={(e) => cambiaMarketing(e.target.checked)} />
+          <span>
+            <strong>Promozioni e novità</strong>
+            <span className="testo-secondario" style={{ display: 'block', fontSize: '0.85rem' }}>
+              {dati.consensoMarketing ? 'Ricevi le promo via SMS, notifiche o email. Puoi toglierlo quando vuoi.' : 'Non ricevi comunicazioni. Attivalo per sapere delle promo.'}
+            </span>
+          </span>
+        </label>
+        <p className="testo-secondario" style={{ fontSize: '0.85rem' }}>
+          Informativa accettata il {dati.consensoServizioIl ? new Date(dati.consensoServizioIl).toLocaleDateString('it-IT') : '—'}
+          {dati.informativaVersione ? ` (versione ${dati.informativaVersione})` : ''}.{' '}
+          <Link to="/privacy">Leggi l'informativa</Link>
+          {dati.informativaVersione && dati.informativaCorrente && dati.informativaVersione !== dati.informativaCorrente ? ' — aggiornata dopo la tua iscrizione.' : ''}
         </p>
-        {dati.consensoMarketing && (
-          <button className="btn btn-secondario" onClick={revocaMarketing}>
-            Revoca consenso marketing
-          </button>
-        )}
+        <button className="btn btn-secondario" onClick={scaricaDati} disabled={esportazione}>
+          {esportazione ? 'Preparo il file…' : 'Scarica i miei dati'}
+        </button>
+        {messaggioPrivacy && <p className="messaggio-successo" style={{ marginBottom: 0 }}>{messaggioPrivacy}</p>}
       </div>
 
       <div className="card">

@@ -2,6 +2,7 @@ const pool = require('../db/pool');
 const otpService = require('../services/otpService');
 const jwtService = require('../services/jwtService');
 const promozioniService = require('../services/promozioniService');
+const { INFORMATIVA_VERSIONE } = require('../config/privacy');
 const { opzioniCookie } = require('../services/cookieOptions');
 
 function normalizzaTelefono(telefono) {
@@ -76,8 +77,8 @@ async function completaProfilo(req, res, next) {
     const { rows: clienteRows } = await client.query(
       `INSERT INTO clienti
         (telefono, telefono_verificato, email, nome, cognome, data_nascita, livello_id,
-         consenso_servizio_il, consenso_marketing_il)
-       VALUES ($1, true, $2, $3, $4, $5, $6, now(), $7)
+         consenso_servizio_il, consenso_marketing_il, informativa_versione)
+       VALUES ($1, true, $2, $3, $4, $5, $6, now(), $7, $8)
        RETURNING id, nome`,
       [
         telefono,
@@ -87,6 +88,7 @@ async function completaProfilo(req, res, next) {
         dataNascita || null,
         livelloBase[0]?.id || null,
         consensoMarketing ? new Date() : null,
+        INFORMATIVA_VERSIONE,
       ]
     );
     const cliente = clienteRows[0];
@@ -137,11 +139,11 @@ async function registra(req, res, next) {
     const { rows: clienteRows } = await client.query(
       `INSERT INTO clienti
         (telefono, telefono_verificato, email, nome, cognome, data_nascita, livello_id,
-         consenso_servizio_il, consenso_marketing_il)
-       VALUES ($1, false, $2, $3, $4, $5, $6, now(), $7)
+         consenso_servizio_il, consenso_marketing_il, informativa_versione)
+       VALUES ($1, false, $2, $3, $4, $5, $6, now(), $7, $8)
        RETURNING id`,
       [telefono, email || null, nome, cognome || null, dataNascita || null,
-       livelloBase[0]?.id || null, consensoMarketing ? new Date() : null]
+       livelloBase[0]?.id || null, consensoMarketing ? new Date() : null, INFORMATIVA_VERSIONE]
     );
     const cliente = clienteRows[0];
     await client.query(

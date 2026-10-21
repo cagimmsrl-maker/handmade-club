@@ -172,6 +172,15 @@ h2 { font-size: 1.15rem; }
   background: var(--crema-scura);
 }
 
+/* Interruttore consenso nel profilo */
+.campo-interruttore { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; margin-bottom: 10px; }
+.campo-interruttore input { width: 22px; height: 22px; margin: 2px 0 0; accent-color: var(--terracotta); flex: none; }
+.privacy h1 { font-size: 1.5rem; margin: 6px 0 2px; }
+.privacy .card h2 { font-size: 1.05rem; margin: 0 0 8px; }
+.privacy .card p { margin: 0 0 8px; line-height: 1.5; }
+.privacy .card p:last-child { margin-bottom: 0; }
+.privacy a { color: var(--terracotta); }
+
 .card-link {
   display: flex;
   align-items: center;
