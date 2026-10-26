@@ -25,6 +25,16 @@ jobs:
           echo "--- corpo (prime righe)"
           curl -sk -m 8 "https://$HOST:9443/" 2>/dev/null | tr -d '\r' | grep -ioE "<title>[^<]*</title>|realm=\"[^\"]*\"|tgs|mikrotik|fritz|zyxel|tp-link|huawei|cisco|draytek|ubiquiti|teltonika|iis|apache|nginx" | sort -u | head -10 || true
 
+      - name: Chi risponde su 8089
+        run: |
+          for proto in http https; do
+            echo "=== $proto://$HOST:8089/"
+            curl -skv -m 8 "$proto://$HOST:8089/" -o /tmp/corpo_$proto 2>&1 | grep -iE "subject:|issuer:|^< HTTP|^< server|^< location|^< www-authenticate|^< content-type" || true
+            echo "--- corpo (estratto)"; head -c 600 /tmp/corpo_$proto | tr -d '\r' | tr -s ' \n' | head -c 600; echo
+          done
+          sudo apt-get install -y -qq nmap >/dev/null 2>&1
+          sudo nmap -Pn -sV -p 8089,4711 $HOST | grep -E "^[0-9]+/tcp|Service Info"
+
       - name: Scansione completa porte (nmap, da Internet)
         run: |
           sudo apt-get install -y -qq nmap >/dev/null 2>&1
