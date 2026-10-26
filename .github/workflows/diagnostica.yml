@@ -20,9 +20,10 @@ jobs:
           for p in $PORTE; do
             if timeout 5 bash -c "</dev/tcp/$HOST/$p" 2>/dev/null; then echo "runner -> porta $p: APERTA"; else echo "runner -> porta $p: chiusa/filtrata"; fi
           done
-          for p in $PORTE; do
-            echo "--- HTTP porta $p"; curl -sk -m 6 -o /dev/null -w "HTTP %{http_code} server=%header{server}\n" "http://$HOST:$p/" || true
-          done
+          echo "--- chi risponde su 8443 (HTTPS)"
+          curl -skv -m 8 -o /dev/null "https://$HOST:8443/" 2>&1 | grep -iE "subject:|issuer:|^< server|^< HTTP|^< location|^< www-authenticate|realm" || true
+          echo "--- corpo (prime righe)"
+          curl -sk -m 8 "https://$HOST:8443/" 2>/dev/null | tr -d '\r' | grep -ioE "<title>[^<]*</title>|realm=\"[^\"]*\"|tgs|mikrotik|fritz|zyxel|tp-link|huawei|cisco|draytek|ubiquiti|teltonika|iis|apache|nginx" | sort -u | head -10 || true
 
       - name: Prepara chiave SSH
         run: |
