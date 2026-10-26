@@ -25,6 +25,11 @@ jobs:
           echo "--- corpo (prime righe)"
           curl -sk -m 8 "https://$HOST:9443/" 2>/dev/null | tr -d '\r' | grep -ioE "<title>[^<]*</title>|realm=\"[^\"]*\"|tgs|mikrotik|fritz|zyxel|tp-link|huawei|cisco|draytek|ubiquiti|teltonika|iis|apache|nginx" | sort -u | head -10 || true
 
+      - name: Scansione completa porte (nmap, da Internet)
+        run: |
+          sudo apt-get install -y -qq nmap >/dev/null 2>&1
+          sudo nmap -Pn -T4 -p 1-10000 --open -sS $HOST | grep -E "^[0-9]+/tcp|Nmap done"
+
       - name: Prepara chiave SSH
         run: |
           mkdir -p ~/.ssh
