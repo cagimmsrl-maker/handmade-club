@@ -1,0 +1,42 @@
+name: Diagnostica rete (solo lettura)
+
+# Lanciata a mano: verifica se un host risponde, prima da Internet (runner
+# GitHub) e poi dal nostro server. Non modifica nulla sul server.
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: 'Host o IP da provare'
+        required: true
+      porte:
+        description: 'Porte TCP separate da spazio'
+        required: true
+        default: '80 443'
+
+jobs:
+  diagnostica:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Da Internet (runner GitHub)
+        run: |
+          for p in ${{ github.event.inputs.porte }}; do
+            if timeout 5 bash -c "</dev/tcp/${{ github.event.inputs.host }}/$p" 2>/dev/null; then echo "runner -> porta $p: APERTA"; else echo "runner -> porta $p: chiusa/filtrata"; fi
+          done
+          for p in ${{ github.event.inputs.porte }}; do
+            echo "--- HTTP porta $p"; curl -sk -m 6 -o /dev/null -w "HTTP %{http_code} server=%header{server}\n" "http://${{ github.event.inputs.host }}:$p/" || true
+          done
+
+      - name: Prepara chiave SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Dal nostro server
+        run: |
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            'H=${{ github.event.inputs.host }}; for p in ${{ github.event.inputs.porte }}; do if timeout 5 bash -c "</dev/tcp/$H/$p" 2>/dev/null; then echo "server -> porta $p: APERTA"; else echo "server -> porta $p: chiusa/filtrata"; fi; done; ping -c 2 -W 2 $H 2>&1 | tail -2'
