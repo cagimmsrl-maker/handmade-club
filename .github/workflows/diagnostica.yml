@@ -8,7 +8,7 @@ on:
 
 env:
   HOST: '5.154.199.20'
-  PORTE: '80 443 8080 8443'
+  PORTE: '9443 8443'
 
 jobs:
   diagnostica:
@@ -21,9 +21,9 @@ jobs:
             if timeout 5 bash -c "</dev/tcp/$HOST/$p" 2>/dev/null; then echo "runner -> porta $p: APERTA"; else echo "runner -> porta $p: chiusa/filtrata"; fi
           done
           echo "--- chi risponde su 8443 (HTTPS)"
-          curl -skv -m 8 -o /dev/null "https://$HOST:8443/" 2>&1 | grep -iE "subject:|issuer:|^< server|^< HTTP|^< location|^< www-authenticate|realm" || true
+          curl -skv -m 8 -o /dev/null "https://$HOST:9443/" 2>&1 | grep -iE "subject:|issuer:|^< server|^< HTTP|^< location|^< www-authenticate|realm" || true
           echo "--- corpo (prime righe)"
-          curl -sk -m 8 "https://$HOST:8443/" 2>/dev/null | tr -d '\r' | grep -ioE "<title>[^<]*</title>|realm=\"[^\"]*\"|tgs|mikrotik|fritz|zyxel|tp-link|huawei|cisco|draytek|ubiquiti|teltonika|iis|apache|nginx" | sort -u | head -10 || true
+          curl -sk -m 8 "https://$HOST:9443/" 2>/dev/null | tr -d '\r' | grep -ioE "<title>[^<]*</title>|realm=\"[^\"]*\"|tgs|mikrotik|fritz|zyxel|tp-link|huawei|cisco|draytek|ubiquiti|teltonika|iis|apache|nginx" | sort -u | head -10 || true
 
       - name: Prepara chiave SSH
         run: |
