@@ -13,7 +13,7 @@ env:
 jobs:
   diagnostica:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
       - name: Da Internet (runner GitHub)
         run: |
@@ -28,7 +28,7 @@ jobs:
       - name: Scansione completa porte (nmap, da Internet)
         run: |
           sudo apt-get install -y -qq nmap >/dev/null 2>&1
-          sudo nmap -Pn -T4 -p 1-10000 --open -sS $HOST | grep -E "^[0-9]+/tcp|Nmap done"
+          sudo nmap -Pn -T4 --min-rate 1500 --max-retries 1 -p 1-10000 --open -sS $HOST | grep -E "^[0-9]+/tcp|Nmap done"
 
       - name: Prepara chiave SSH
         run: |
