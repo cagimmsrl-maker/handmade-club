@@ -3,15 +3,12 @@ name: Diagnostica rete (solo lettura)
 # Lanciata a mano: verifica se un host risponde, prima da Internet (runner
 # GitHub) e poi dal nostro server. Non modifica nulla sul server.
 on:
-  workflow_dispatch:
-    inputs:
-      host:
-        description: 'Host o IP da provare'
-        required: true
-      porte:
-        description: 'Porte TCP separate da spazio'
-        required: true
-        default: '80 443'
+  push:
+    branches: [diagnostica-rete]
+
+env:
+  HOST: '5.154.199.20'
+  PORTE: '80 443 8080 8443'
 
 jobs:
   diagnostica:
@@ -20,11 +17,11 @@ jobs:
     steps:
       - name: Da Internet (runner GitHub)
         run: |
-          for p in ${{ github.event.inputs.porte }}; do
-            if timeout 5 bash -c "</dev/tcp/${{ github.event.inputs.host }}/$p" 2>/dev/null; then echo "runner -> porta $p: APERTA"; else echo "runner -> porta $p: chiusa/filtrata"; fi
+          for p in $PORTE; do
+            if timeout 5 bash -c "</dev/tcp/$HOST/$p" 2>/dev/null; then echo "runner -> porta $p: APERTA"; else echo "runner -> porta $p: chiusa/filtrata"; fi
           done
-          for p in ${{ github.event.inputs.porte }}; do
-            echo "--- HTTP porta $p"; curl -sk -m 6 -o /dev/null -w "HTTP %{http_code} server=%header{server}\n" "http://${{ github.event.inputs.host }}:$p/" || true
+          for p in $PORTE; do
+            echo "--- HTTP porta $p"; curl -sk -m 6 -o /dev/null -w "HTTP %{http_code} server=%header{server}\n" "http://$HOST:$p/" || true
           done
 
       - name: Prepara chiave SSH
@@ -39,4 +36,4 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            'H=${{ github.event.inputs.host }}; for p in ${{ github.event.inputs.porte }}; do if timeout 5 bash -c "</dev/tcp/$H/$p" 2>/dev/null; then echo "server -> porta $p: APERTA"; else echo "server -> porta $p: chiusa/filtrata"; fi; done; ping -c 2 -W 2 $H 2>&1 | tail -2'
+            "H=$HOST; for p in $PORTE; do if timeout 5 bash -c \"</dev/tcp/\$H/\$p\" 2>/dev/null; then echo \"server -> porta \$p: APERTA\"; else echo \"server -> porta \$p: chiusa/filtrata\"; fi; done; ping -c 2 -W 2 \$H 2>&1 | tail -2"
