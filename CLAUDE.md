@@ -53,7 +53,10 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
    Per i test si usano numeri di telefono reali del titolare/staff.
 4. **Questo è un sistema pubblico esposto a Internet.** A differenza del gestionale (trust-based),
    qui la sicurezza è rigorosa:
-   - Rate limiting su tutte le rotte pubbliche (login, richiesta OTP: max 5 richieste/15 min per IP e per numero)
+   - Rate limiting su tutte le rotte pubbliche. Per IP: login admin/operatore 5/15 min; registrazione
+     120/15 min; OTP 40/15 min (dal 26/10/2026: nel locale tutti i clienti escono con lo stesso IP, e
+     le reti mobili usano CGNAT — il limite per IP ferma solo gli abusi automatici). Il tetto vero per
+     gli OTP è **per numero** (otpService: max richieste per numero, 3 tentativi per codice).
    - OTP a 6 cifre, validità 5 minuti, monouso, max 3 tentativi di verifica
    - Sessioni con JWT httpOnly + secure, scadenza 30 giorni (i clienti non devono riloggarsi ogni volta)
    - Input validation su ogni endpoint (mai fidarsi del client)
