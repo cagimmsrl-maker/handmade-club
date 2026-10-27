@@ -12,6 +12,20 @@
 
 const SKEBBY_BASE = 'https://api.skebby.it/API/v1.0/REST';
 
+// Skebby vuole il numero in formato internazionale senza '+' (39335…).
+// I clienti spesso si registrano senza +39: qui si normalizza SOLO per
+// l'invio, senza toccare il numero salvato. Stessa logica di tgsController.
+function numeroPerSkebby(telefono) {
+  let s = String(telefono || '').replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
+  if (!s.startsWith('+')) {
+    if (s.startsWith('00')) s = '+' + s.slice(2);
+    else if (/^39\d{9,10}$/.test(s)) s = '+' + s;
+    else if (/^3\d{8,9}$/.test(s)) s = '+39' + s;
+    else if (/^0\d{5,10}$/.test(s)) s = '+39' + s;
+  }
+  return s.replace(/^\+/, '');
+}
+
 function mascheraNumero(telefono) {
   const t = String(telefono);
   return t.length > 4 ? `${t.slice(0, 3)}…${t.slice(-3)}` : '***';
@@ -58,7 +72,7 @@ const providers = {
       const corpo = {
         message_type: process.env.SKEBBY_MESSAGE_TYPE || 'GP',
         message: testo,
-        recipient: [String(telefono).replace(/^\+/, '')],
+        recipient: [numeroPerSkebby(telefono)],
         sender: process.env.SKEBBY_SENDER || undefined,
         returnCredits: false,
       };
@@ -105,4 +119,4 @@ async function inviaOtp(telefono, codice) {
   await getProvider().inviaOtp(telefono, codice);
 }
 
-module.exports = { inviaOtp };
+module.exports = { inviaOtp, numeroPerSkebby };
