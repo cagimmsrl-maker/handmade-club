@@ -114,6 +114,14 @@ h2 { font-size: 1.15rem; }
   font-size: 1.05rem;
   color: #fff;
 }
+.tessera-barcode {
+  display: block;
+  width: min(100%, 260px);
+  height: auto;
+  margin: 10px auto 2px;
+  background: #fff;
+  border-radius: 8px;
+}
 .tessera-nota { margin: 0; font-size: 0.78rem; color: rgba(255, 241, 226, 0.75); }
 .tessera-piede {
   display: flex;

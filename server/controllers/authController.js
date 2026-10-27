@@ -6,6 +6,27 @@ const { INFORMATIVA_VERSIONE } = require('../config/privacy');
 const tgs = require('../services/tgs');
 const { opzioniCookie } = require('../services/cookieOptions');
 
+// Crea la tessera con un codice EAN-13 casuale; se per caso il codice esiste
+// già (UNIQUE), ne prova un altro. Usa un SAVEPOINT per non far saltare la
+// transazione della registrazione.
+async function inserisciTessera(client, clienteId, codiceTessera) {
+  for (let tentativo = 0; tentativo < 5; tentativo++) {
+    await client.query('SAVEPOINT tessera');
+    try {
+      await client.query(
+        `INSERT INTO tessere (cliente_id, codice, codice_qr) VALUES ($1, $2, $3)`,
+        [clienteId, codiceTessera, promozioniService.generaCodiceQr()]
+      );
+      await client.query('RELEASE SAVEPOINT tessera');
+      return;
+    } catch (err) {
+      await client.query('ROLLBACK TO SAVEPOINT tessera');
+      if (err.code !== '23505' || !/codice_qr/.test(err.constraint || err.detail || '')) throw err;
+    }
+  }
+  throw new Error('Impossibile generare un codice tessera univoco.');
+}
+
 function normalizzaTelefono(telefono) {
   return telefono.trim().replace(/[\s-]/g, '');
 }
@@ -95,10 +116,7 @@ async function completaProfilo(req, res, next) {
     const cliente = clienteRows[0];
 
     const codiceTessera = `HC-${String(cliente.id).padStart(6, '0')}`;
-    await client.query(
-      `INSERT INTO tessere (cliente_id, codice, codice_qr) VALUES ($1, $2, $3)`,
-      [cliente.id, codiceTessera, promozioniService.generaCodiceQr()]
-    );
+    await inserisciTessera(client, cliente.id, codiceTessera);
 
     await client.query('COMMIT');
     tgs.clienteCreatoOAggiornato(cliente.id);
@@ -148,10 +166,7 @@ async function registra(req, res, next) {
        livelloBase[0]?.id || null, consensoMarketing ? new Date() : null, INFORMATIVA_VERSIONE]
     );
     const cliente = clienteRows[0];
-    await client.query(
-      `INSERT INTO tessere (cliente_id, codice, codice_qr) VALUES ($1, $2, $3)`,
-      [cliente.id, `HC-${String(cliente.id).padStart(6, '0')}`, promozioniService.generaCodiceQr()]
-    );
+    await inserisciTessera(client, cliente.id, `HC-${String(cliente.id).padStart(6, '0')}`);
     await client.query('COMMIT');
     tgs.clienteCreatoOAggiornato(cliente.id);
 

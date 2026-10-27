@@ -16,9 +16,28 @@ const COLONNE = `
   p.stato, p.pubblicata_il, p.created_at, p.immagine, p.codice_tgs
 `;
 
-// Codice QR statico per una tessera: 12 esadecimali maiuscoli (48 bit).
+// Codice tessera statico, nel QR e nel codice a barre: EAN-13 con prefisso
+// interno 99911 (richiesta TGS del 27/10/2026: "13 cifre che iniziano per
+// 99911"). 99911 + 7 cifre casuali + cifra di controllo EAN: così lo legge
+// qualunque lettore di cassa, 1D o 2D. 10 milioni di combinazioni; l'unicità
+// la garantisce il vincolo UNIQUE su tessere.codice_qr (si ritenta su 23505).
+const PREFISSO_CARD = '99911';
+
+function cifraControlloEan13(dodici) {
+  let somma = 0;
+  for (let i = 0; i < 12; i++) somma += Number(dodici[i]) * (i % 2 === 0 ? 1 : 3);
+  return String((10 - (somma % 10)) % 10);
+}
+
 function generaCodiceQr() {
-  return crypto.randomBytes(6).toString('hex').toUpperCase();
+  const corpo = String(crypto.randomInt(0, 10_000_000)).padStart(7, '0');
+  const dodici = PREFISSO_CARD + corpo;
+  return dodici + cifraControlloEan13(dodici);
+}
+
+function codiceCardValido(codice) {
+  const s = String(codice || '');
+  return /^\d{13}$/.test(s) && s.startsWith(PREFISSO_CARD) && cifraControlloEan13(s.slice(0, 12)) === s[12];
 }
 
 // La promo è utilizzabile in questo istante (ora locale del server, che è
@@ -248,7 +267,7 @@ function serializza(r) {
 }
 
 module.exports = {
-  TIPI, generaCodiceQr, validaOra,
+  TIPI, generaCodiceQr, codiceCardValido, cifraControlloEan13, PREFISSO_CARD, validaOra,
   bachecaPerCliente, carica, caricateUtilizzabili, segnaUsata,
   listaAdmin, creaAdmin, aggiornaAdmin, cambiaStato, eliminaAdmin, impostaImmagine,
 };

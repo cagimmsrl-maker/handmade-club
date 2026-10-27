@@ -65,8 +65,13 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
    - `/` → app cliente (pubblica, registrazione immediata + verifica OTP differita, vedi sotto)
    - `/operatore` → schermata scansione QR (login con PIN sede, pensata per tablet al banco)
    - `/admin` → pannello amministrazione (login con password, solo titolare/manager)
-6. **QR statico (dal 18/10/2026, migrazione 003).** Il QR del cliente è `tessere.codice_qr`, un codice
-   casuale fisso (12 esadecimali), così le casse lo leggono come un codice a barre e si può stampare.
+6. **QR statico (dal 18/10/2026, migrazione 003; formato EAN-13 dal 27/10/2026, migrazione 012).** Il
+   codice del cliente è `tessere.codice_qr`: **13 cifre, prefisso `99911` + 7 cifre casuali + cifra di
+   controllo EAN-13** (richiesta TGS; `promozioniService.generaCodiceQr`/`codiceCardValido`, vincolo
+   CHECK `tessere_codice_qr_formato`; alla registrazione si ritenta su collisione). In app è mostrato
+   sia come QR sia come codice a barre EAN-13 (`CodiceBarre.jsx`, jsbarcode) per i lettori laser 1D.
+   I codici esadecimali precedenti sono stati ri-emessi dalla 012 (nessuna card stampata, nessun
+   cliente ancora in TGS). Se una card già creata in TGS venisse ri-emessa, va rifatta anche lì.
    Ha sostituito il token JWT rotante: lo screenshot condiviso è un rischio accettato, mitigato dal
    fatto che l'operatore vede nome e livello e che le promo sono legate all'account; con TGS sarà la
    cassa a verificare. `GET /cliente/qr-token` e il campo `qrToken` della scansione restano solo per

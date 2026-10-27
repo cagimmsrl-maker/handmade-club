@@ -1,4 +1,5 @@
 import { QRCodeSVG } from 'qrcode.react'
+import CodiceBarre from './CodiceBarre.jsx'
 
 // La tessera fedeltà come la vede il cliente: card scura con il logo, il
 // livello, il QR statico (tessere.codice_qr) e il codice umano. Il QR è
@@ -23,7 +24,7 @@ export default function Tessera({ nome, codiceQr, codiceTessera, livello, visite
         <div className="tessera-qr" style={{ width: 224, height: 224 }} />
       )}
 
-      {codiceQr && <p className="tessera-codice">{codiceQr.replace(/(.{4})/g, '$1 ').trim()}</p>}
+      {codiceQr && <CodiceBarre codice={codiceQr} />}
       <p className="tessera-nota">Mostra il codice alla cassa</p>
 
       <div className="tessera-piede">
