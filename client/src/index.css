@@ -1,4 +1,7 @@
 :root {
+  /* Solo tema chiaro: i browser Android con "tema scuro per i siti" invertirebbero
+     i colori del QR e del codice a barre, rendendoli illeggibili in cassa. */
+  color-scheme: only light;
   /* Palette Handmade Café: terracotta del logo, crema del sito, nero caldo. */
   --terracotta: #80321A;
   --terracotta-viva: #C8431C;
@@ -113,6 +116,12 @@ h2 { font-size: 1.15rem; }
   letter-spacing: 0.18em;
   font-size: 1.05rem;
   color: #fff;
+}
+.tessera-qr, .tessera-barcode {
+  color-scheme: only light;
+  forced-color-adjust: none;
+  -webkit-filter: none;
+  filter: none;
 }
 .tessera-barcode {
   display: block;
