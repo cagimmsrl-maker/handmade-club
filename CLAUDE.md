@@ -182,7 +182,17 @@ camelCase); il codice la segue alla lettera, in `tgsController.js`, `tgs.schema.
 - Admin: riepilogo per sede `GET /admin/tgs/sincronizzazione`; nella lista clienti la colonna
   "Cassa (TGS)" mostra per sede creato/già presente/errore con messaggio e numero card.
 - Nessun ambiente di prova separato: il collaudo con TGS si fa sulla sede reale con i clienti dello
-  staff. Promozioni e prepagate verso la cassa: fase successiva, da concordare con TGS.
+  staff. Prepagate verso la cassa: fase successiva.
+- **v2 (27/10/2026, migrazione 010, `tgsPromozioniController.js`), proposta a TGS con
+  `docs/API_TGS_v2_promozioni_e_passaggi.html`, già attiva lato app:**
+  `GET /api/tgs/promozioni-da-sincronizzare` (promo caricate da clienti già `creato`/`gia_presente`
+  in quella sede; pubblicate, non scadute, non `messaggio`, destinate alla sede o a tutte; id =
+  `promozioni_clienti.id`), `POST /api/tgs/promozioni/{id}/esito` (`creata|errore`, idempotente su
+  `tgs_sinc_promozioni (promozione_cliente_id, sede_id)`), `POST /api/tgs/passaggi` (scontrino con QR:
+  crea la `scansione` con la stessa regola 2h della schermata operatore, ricalcola il livello, scrive
+  `promozioni_utilizzi` per le `promozioniUsate` del cliente; idempotente su `tgs_passaggi (sede_id,
+  numero_scontrino)`; `passatoIl` è la data che conta). Con i passaggi attivi il tablet operatore non
+  serve più in cassa. Aperti con TGS: codici articolo per prezzo_fisso/omaggio; revoca promo archiviate.
 - Aperto con TGS: con esito `gia_presente` il QR dell'app oggi NON diventa card del cliente
   esistente; da decidere.
 

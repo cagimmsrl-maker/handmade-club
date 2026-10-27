@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>API fidelity Handmade Club – v2: promozioni e passaggi</title>
+<style>
+  :root { --bg:#f7f8fa; --surface:#fff; --fg:#1b2430; --muted:#5a6676; --line:#d9dee6; --accent:#80321a; --accent-soft:#fbf1ea; --code-bg:#f0f2f5; --warn:#8a5a00; --warn-bg:#fff4d6; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 "Segoe UI",system-ui,sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:40px 16px 64px; }
+  h1 { font-size:28px; margin:0 0 6px; } .sotto { color:var(--muted); margin:0 0 28px; }
+  h2 { font-size:21px; margin:40px 0 10px; padding-top:18px; border-top:1px solid var(--line); }
+  h3 { font-size:17px; margin:24px 0 8px; }
+  code, pre { font-family:Consolas,"Courier New",monospace; font-size:14px; }
+  code { background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+  pre { background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:14px 16px; overflow-x:auto; line-height:1.5; }
+  pre code { background:none; padding:0; }
+  .endpoint { display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:var(--accent-soft); border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin:12px 0; }
+  .metodo { font-family:Consolas,monospace; font-weight:600; color:#fff; background:var(--accent); border-radius:4px; padding:1px 8px; }
+  .percorso { font-family:Consolas,monospace; font-weight:500; word-break:break-all; }
+  .tabella { overflow-x:auto; margin:10px 0 16px; }
+  table { border-collapse:collapse; width:100%; background:var(--surface); font-size:15px; }
+  th, td { text-align:left; vertical-align:top; padding:8px 10px; border-bottom:1px solid var(--line); }
+  th { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  td:first-child { font-family:Consolas,monospace; white-space:nowrap; }
+  .nota { background:var(--warn-bg); border:1px solid var(--line); border-left:4px solid var(--warn); border-radius:6px; padding:10px 14px; margin:14px 0; }
+  .flusso { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:14px 16px; overflow-x:auto; }
+  ul, ol { padding-left:22px; } li + li { margin-top:4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>API fidelity Handmade Club – v2</h1>
+  <p class="sotto">Estensione della specifica "API clienti fidelity TGS v1" (26/10/2026): promozioni caricate dal cliente verso la cassa e passaggi in cassa verso l'app. CAR FOOD S.r.l. · Versione 2 · 27/10/2026. <strong>Già implementata e attiva lato app.</strong></p>
+
+  <h2>Come funziona</h2>
+  <p>Stesso modello della v1: il servizio TGS accanto alla cassa chiama l'app, con la stessa chiave <code>X-Api-Key</code> del punto vendita, in HTTPS. Si aggiungono due flussi:</p>
+  <ol>
+    <li><strong>Promozioni</strong> (app → cassa): il cliente carica una promozione in app; il servizio la legge e la crea in TGS collegata alla sua card, poi comunica l'esito.</li>
+    <li><strong>Passaggi</strong> (cassa → app): quando la cassa legge il QR del cliente, il servizio comunica all'app lo scontrino e le promozioni applicate. Da lì l'app conta la visita, aggiorna il livello e segna le promozioni usate.</li>
+  </ol>
+  <pre class="flusso">App (server cloud)                                Servizio TGS sul punto vendita
+  │                                                   │
+  │  ◄── 3. GET promozioni da sincronizzare ──────────┤  ogni ~10 s
+  │  ─── promo caricate (per card già creata) ──────► │
+  │                                                   ├── crea la promo in TGS sulla card
+  │  ◄── 4. POST esito promozione ────────────────────┤
+  │  ─── 204 ───────────────────────────────────────► │
+  │                                                   │
+  │  ◄── 5. POST passaggio (a ogni scontrino con QR) ─┤
+  │  ─── 204 ───────────────────────────────────────► │</pre>
+  <p>Una promozione compare nell'elenco solo quando il cliente risulta già creato in TGS per quel punto vendita (esito v1 <code>creato</code> o <code>gia_presente</code>): l'ordine cliente → card → promozione è garantito dall'app.</p>
+
+  <h2>Requisiti generali</h2>
+  <ul>
+    <li>Come la v1: HTTPS, <code>X-Api-Key</code> per punto vendita (<code>401</code> se mancante o errata), JSON UTF-8, date ISO 8601 con fuso.</li>
+    <li>Tutti gli <code>id</code> sono stringhe stabili. L'<code>id</code> di una promozione caricata identifica la coppia (cliente, promozione): la stessa promozione caricata da due clienti ha due id diversi.</li>
+    <li>Gli esiti sono idempotenti: ripetere lo stesso esito dà <code>204</code> senza effetti. Un passaggio con lo stesso <code>numeroScontrino</code> dà <code>204</code> senza contare due volte.</li>
+  </ul>
+
+  <h2>3. Promozioni da sincronizzare</h2>
+  <div class="endpoint"><span class="metodo">GET</span><span class="percorso">/api/tgs/promozioni-da-sincronizzare?limite=50</span></div>
+  <p>Restituisce le promozioni caricate dai clienti per cui non è ancora arrivato un esito, dalla più vecchia, al massimo <code>limite</code> (predefinito 50). Solo promozioni pubblicate, non scadute, applicabili in cassa (le promozioni di solo messaggio non compaiono) e destinate a questo punto vendita o a tutti.</p>
+  <h3>Campi di ogni elemento</h3>
+  <div class="tabella"><table>
+    <thead><tr><th>Campo</th><th>Tipo</th><th>Regole</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>stringa</td><td>ID della promozione caricata (cliente + promozione). Stabile, max 64.</td></tr>
+      <tr><td>qrCode</td><td>stringa</td><td>QR del cliente, lo stesso della v1.</td></tr>
+      <tr><td>codiceClienteTgs</td><td>stringa</td><td>Il codice cliente TGS comunicato nell'esito v1 (comodo per non rifare la ricerca). <code>null</code> se non disponibile.</td></tr>
+      <tr><td>caricataIl</td><td>data e ora</td><td>Quando il cliente ha caricato la promozione in app.</td></tr>
+      <tr><td>promozione.id</td><td>stringa</td><td>ID della promozione (uguale per tutti i clienti che la caricano).</td></tr>
+      <tr><td>promozione.titolo</td><td>stringa</td><td>Max 100. Da usare come descrizione in TGS.</td></tr>
+      <tr><td>promozione.tipo</td><td>stringa</td><td><code>sconto_percentuale</code>: sconto % sullo scontrino (<code>valore</code> = percentuale).<br><code>prezzo_fisso</code>: un articolo a prezzo fisso (<code>valore</code> = prezzo in euro, <code>prodotto</code> = descrizione articolo).<br><code>omaggio</code>: articolo in omaggio / 2x1 (<code>prodotto</code> = descrizione articolo).</td></tr>
+      <tr><td>promozione.valore</td><td>numero</td><td>Vedi tipo. <code>null</code> per omaggio.</td></tr>
+      <tr><td>promozione.prodotto</td><td>stringa</td><td>Descrizione libera dell'articolo. <strong>Da concordare:</strong> per applicarla in automatico serve il codice articolo TGS (vedi "Da concordare").</td></tr>
+      <tr><td>promozione.validoDal / validoAl</td><td>data</td><td>Periodo di validità (<code>AAAA-MM-GG</code>), estremi inclusi.</td></tr>
+      <tr><td>promozione.oraInizio / oraFine</td><td>ora</td><td>Fascia oraria facoltativa (<code>HH:MM</code>), <code>null</code> = tutto il giorno.</td></tr>
+      <tr><td>promozione.giorniSettimana</td><td>array di interi</td><td>Giorni validi, 0 = domenica … 6 = sabato. <code>null</code> = tutti i giorni.</td></tr>
+      <tr><td>promozione.usiPerCliente</td><td>intero</td><td>Quante volte il cliente può usarla. <code>null</code> = illimitata nel periodo.</td></tr>
+      <tr><td>promozione.usiResidui</td><td>intero</td><td>Usi ancora disponibili al momento della risposta. <code>null</code> se illimitata.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Esempio di risposta (200)</h3>
+<pre><code>{
+  "promozioni": [
+    {
+      "id": "184",
+      "qrCode": "6BEB823D35A4",
+      "codiceClienteTgs": "1LR99A01135",
+      "caricataIl": "2026-10-27T11:46:52+01:00",
+      "promozione": {
+        "id": "7",
+        "titolo": "Caffè -20%",
+        "tipo": "sconto_percentuale",
+        "valore": 20,
+        "prodotto": null,
+        "validoDal": "2026-10-27",
+        "validoAl": "2026-11-30",
+        "oraInizio": null,
+        "oraFine": null,
+        "giorniSettimana": null,
+        "usiPerCliente": 2,
+        "usiResidui": 2
+      }
+    }
+  ]
+}</code></pre>
+  <p>Nessuna promozione: <code>{"promozioni": []}</code> con codice <code>200</code>.</p>
+
+  <h2>4. Esito della promozione</h2>
+  <div class="endpoint"><span class="metodo">POST</span><span class="percorso">/api/tgs/promozioni/{id}/esito</span></div>
+  <p>Una volta per ogni promozione caricata, dopo averla creata in TGS. Da quel momento non compare più nell'elenco del punto 3.</p>
+  <div class="tabella"><table>
+    <thead><tr><th>Campo</th><th>Tipo</th><th>Quando</th><th>Significato</th></tr></thead>
+    <tbody>
+      <tr><td>esito</td><td>stringa</td><td>sempre</td><td><code>creata</code>: promozione creata in TGS sulla card del cliente.<br><code>errore</code>: dati non accettabili (es. articolo non riconosciuto); non viene ritentata finché non interviene l'operatore dell'app.</td></tr>
+      <tr><td>codicePromozioneTgs</td><td>stringa</td><td>creata</td><td>Identificativo della promozione in TGS, se esiste.</td></tr>
+      <tr><td>messaggio</td><td>stringa</td><td>errore</td><td>Spiegazione leggibile per l'operatore dell'app.</td></tr>
+      <tr><td>elaboratoIl</td><td>data e ora</td><td>sempre</td><td>Momento dell'elaborazione in TGS.</td></tr>
+    </tbody>
+  </table></div>
+<pre><code>POST /api/tgs/promozioni/184/esito
+{
+  "esito": "creata",
+  "codicePromozioneTgs": "PR000031",
+  "elaboratoIl": "2026-10-27T11:47:05+01:00"
+}</code></pre>
+  <p>Risposte: <code>204</code> registrato (anche se ripetuto); <code>401</code> chiave; <code>404</code> id inesistente; <code>422</code> corpo non valido.</p>
+
+  <h2>5. Passaggio in cassa</h2>
+  <div class="endpoint"><span class="metodo">POST</span><span class="percorso">/api/tgs/passaggi</span></div>
+  <p>A ogni scontrino in cui è stato letto il QR di un cliente. L'app registra la visita (al massimo una conteggiata ogni 2 ore per cliente e punto vendita, come oggi dalla schermata operatore), ricalcola il livello e segna usate le promozioni indicate. Con questo flusso la schermata operatore dell'app non è più necessaria in cassa.</p>
+  <div class="tabella"><table>
+    <thead><tr><th>Campo</th><th>Tipo</th><th>Obbligatorio</th><th>Regole</th></tr></thead>
+    <tbody>
+      <tr><td>numeroScontrino</td><td>stringa</td><td>sì</td><td>Identificativo univoco dello scontrino nel punto vendita (max 50). È la chiave di idempotenza.</td></tr>
+      <tr><td>qrCode</td><td>stringa</td><td>sì</td><td>QR letto in cassa.</td></tr>
+      <tr><td>passatoIl</td><td>data e ora</td><td>sì</td><td>Data e ora dello scontrino.</td></tr>
+      <tr><td>totale</td><td>numero</td><td>no</td><td>Totale scontrino in euro (per statistiche future).</td></tr>
+      <tr><td>promozioniUsate</td><td>array di stringhe</td><td>no</td><td>Gli <code>id</code> delle promozioni caricate (punto 3) applicate su questo scontrino. Id non appartenenti al cliente vengono ignorati.</td></tr>
+    </tbody>
+  </table></div>
+<pre><code>POST /api/tgs/passaggi
+{
+  "numeroScontrino": "0012-000481",
+  "qrCode": "6BEB823D35A4",
+  "passatoIl": "2026-10-27T12:10:33+01:00",
+  "totale": 7.80,
+  "promozioniUsate": ["184"]
+}</code></pre>
+  <p>Risposte: <code>204</code> registrato (anche se ripetuto); <code>401</code> chiave; <code>404</code> QR non riconosciuto o tessera non attiva; <code>422</code> corpo non valido.</p>
+  <div class="nota">Se l'app non è raggiungibile, il servizio può accodare i passaggi e inviarli dopo: la data valida è <code>passatoIl</code>, non quella della chiamata.</div>
+
+  <h2>Da concordare</h2>
+  <ul>
+    <li><strong>Articoli.</strong> Per <code>prezzo_fisso</code> e <code>omaggio</code> l'app oggi manda la descrizione dell'articolo. Per l'applicazione automatica in cassa servirebbe il codice articolo TGS: proponiamo che ci forniate l'elenco articoli (codice + descrizione) o un'API per leggerlo, così l'app lo associa alla promozione quando viene creata.</li>
+    <li><strong>Archiviazione.</strong> Se una promozione viene archiviata in app prima della scadenza, oggi non lo comunichiamo: TGS la applica fino a <code>validoAl</code>. Se serve, aggiungiamo <code>GET /api/tgs/promozioni-revocate</code>.</li>
+    <li><strong>Cliente già presente (dalla v1).</strong> Chiediamo che con esito <code>gia_presente</code> il QR dell'app venga comunque associato come nuova card al cliente esistente, altrimenti il QR non funziona in cassa per chi aveva già una card.</li>
+  </ul>
+
+  <h2>Riepilogo degli endpoint</h2>
+  <div class="tabella"><table>
+    <thead><tr><th>Metodo</th><th>Percorso</th><th>Versione</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td>/api/tgs/clienti-da-sincronizzare</td><td>v1</td></tr>
+      <tr><td>POST</td><td>/api/tgs/clienti/{id}/esito</td><td>v1</td></tr>
+      <tr><td>GET</td><td>/api/tgs/promozioni-da-sincronizzare</td><td>v2</td></tr>
+      <tr><td>POST</td><td>/api/tgs/promozioni/{id}/esito</td><td>v2</td></tr>
+      <tr><td>POST</td><td>/api/tgs/passaggi</td><td>v2</td></tr>
+    </tbody>
+  </table></div>
+  <p>Base: <code>https://club.handmadecafe.it</code>. Contatto tecnico: CAR FOOD S.r.l.</p>
+</main>
+</body>
+</html>

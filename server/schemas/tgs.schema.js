@@ -24,4 +24,28 @@ const esitoSchema = z
     elaboratoIl: d.elaboratoIl || null,
   }));
 
-module.exports = { esitoSchema };
+// v2 — esito di una promozione caricata, creata in cassa.
+const esitoPromozioneSchema = z
+  .object({
+    esito: z.enum(['creata', 'errore']),
+    codicePromozioneTgs: testo(50),
+    messaggio: testo(500),
+    elaboratoIl: dataIso,
+  })
+  .transform((d) => ({
+    esito: d.esito,
+    codicePromozioneTgs: d.codicePromozioneTgs || null,
+    messaggio: d.messaggio || null,
+    elaboratoIl: d.elaboratoIl || null,
+  }));
+
+// v2 — passaggio in cassa (lettura del QR allo scontrino).
+const passaggioSchema = z.object({
+  numeroScontrino: z.string().trim().min(1).max(50),
+  qrCode: z.string().trim().min(6).max(50),
+  passatoIl: z.string().datetime({ offset: true }),
+  totale: z.number().min(0).max(100000).optional().nullable(),
+  promozioniUsate: z.array(z.string().trim().max(64)).max(50).optional().nullable(),
+});
+
+module.exports = { esitoSchema, esitoPromozioneSchema, passaggioSchema };
