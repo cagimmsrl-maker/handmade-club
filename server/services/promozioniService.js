@@ -13,7 +13,7 @@ const COLONNE = `
   p.id, p.titolo, p.descrizione, p.tipo, p.valore, p.prodotto,
   p.valido_dal, p.valido_al, p.ora_inizio, p.ora_fine, p.giorni_settimana,
   p.target_livello_id, p.target_sede_id, p.usi_per_cliente,
-  p.stato, p.pubblicata_il, p.created_at, p.immagine
+  p.stato, p.pubblicata_il, p.created_at, p.immagine, p.codice_tgs
 `;
 
 // Codice QR statico per una tessera: 12 esadecimali maiuscoli (48 bit).
@@ -150,14 +150,15 @@ function daBody(b) {
     b.giorniSettimana && b.giorniSettimana.length ? b.giorniSettimana : null,
     b.targetLivelloId ?? null, b.targetSedeId ?? null,
     b.usiPerCliente === null ? null : (b.usiPerCliente ?? 1),
+    b.codiceTgs || null,
   ];
 }
 
 async function creaAdmin(body, adminId) {
   const { rows } = await pool.query(
     `INSERT INTO promozioni (titolo, descrizione, tipo, valore, prodotto, valido_dal, valido_al,
-       ora_inizio, ora_fine, giorni_settimana, target_livello_id, target_sede_id, usi_per_cliente, creata_da)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       ora_inizio, ora_fine, giorni_settimana, target_livello_id, target_sede_id, usi_per_cliente, codice_tgs, creata_da)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      RETURNING id`,
     [...daBody(body), adminId]
   );
@@ -168,8 +169,8 @@ async function aggiornaAdmin(id, body) {
   const { rowCount } = await pool.query(
     `UPDATE promozioni SET titolo=$1, descrizione=$2, tipo=$3, valore=$4, prodotto=$5,
        valido_dal=$6, valido_al=$7, ora_inizio=$8, ora_fine=$9, giorni_settimana=$10,
-       target_livello_id=$11, target_sede_id=$12, usi_per_cliente=$13, updated_at=now()
-     WHERE id=$14 AND stato <> 'archiviata'`,
+       target_livello_id=$11, target_sede_id=$12, usi_per_cliente=$13, codice_tgs=$14, updated_at=now()
+     WHERE id=$15 AND stato <> 'archiviata'`,
     [...daBody(body), id]
   );
   return rowCount > 0;
@@ -235,6 +236,7 @@ function serializza(r) {
     sedeNome: r.sede_nome ?? null,
     usiPerCliente: r.usi_per_cliente,
     immagine: immagini.urlImmaginePromozione(r.immagine),
+    codiceTgs: r.codice_tgs ?? null,
     stato: r.stato,
     pubblicataIl: r.pubblicata_il,
     caricataIl: r.caricata_il ?? null,

@@ -23,7 +23,7 @@ function oggi() {
 const VUOTO = {
   titolo: '', descrizione: '', tipo: 'sconto_percentuale', valore: '', prodotto: '',
   validoDal: oggi(), validoAl: oggi(), oraInizio: '', oraFine: '',
-  giorniSettimana: [], targetLivelloId: '', targetSedeId: '', usiPerCliente: 1, usiIllimitati: false,
+  giorniSettimana: [], targetLivelloId: '', targetSedeId: '', usiPerCliente: 1, usiIllimitati: false, codiceTgs: '',
 }
 
 export default function Promozioni() {
@@ -90,7 +90,7 @@ export default function Promozioni() {
       oraInizio: p.oraInizio ?? '', oraFine: p.oraFine ?? '',
       giorniSettimana: p.giorniSettimana ?? [],
       targetLivelloId: p.targetLivelloId ?? '', targetSedeId: p.targetSedeId ?? '',
-      usiPerCliente: p.usiPerCliente ?? 1, usiIllimitati: p.usiPerCliente == null,
+      usiPerCliente: p.usiPerCliente ?? 1, usiIllimitati: p.usiPerCliente == null, codiceTgs: p.codiceTgs ?? '',
     })
     setEditId(p.id); setErrore(''); setOk(''); azzeraFoto(p.immagine ?? null)
   }
@@ -110,6 +110,7 @@ export default function Promozioni() {
       targetLivelloId: form.targetLivelloId ? Number(form.targetLivelloId) : null,
       targetSedeId: form.targetSedeId ? Number(form.targetSedeId) : null,
       usiPerCliente: form.usiIllimitati ? null : Number(form.usiPerCliente || 1),
+      codiceTgs: form.codiceTgs.trim() || null,
     }
   }
 
@@ -183,7 +184,7 @@ export default function Promozioni() {
             {lista.map((p) => (
               <tr key={p.id} style={{ opacity: p.stato === 'archiviata' ? 0.55 : 1 }}>
                 <td>{p.immagine && <img className="miniatura-foto" src={p.immagine} alt="" />}<strong>{p.titolo}</strong></td>
-                <td>{etichettaTipo(p) ?? 'Messaggio'}</td>
+                <td>{etichettaTipo(p) ?? 'Messaggio'}{p.codiceTgs ? <span className="testo-secondario"> · cassa {p.codiceTgs}</span> : ''}</td>
                 <td>{etichettaValidita(p)}</td>
                 <td>{[p.livelloNome && `livello ${p.livelloNome}`, p.sedeNome].filter(Boolean).join(', ') || 'tutti'}</td>
                 <td>{STATO[p.stato]}</td>
@@ -314,6 +315,16 @@ export default function Promozioni() {
                 <input id="illim" type="checkbox" checked={form.usiIllimitati} onChange={(e) => setForm({ ...form, usiIllimitati: e.target.checked })} />
                 <label htmlFor="illim">Illimitati nel periodo</label>
               </div>
+            </div>
+          )}
+
+          {form.tipo !== 'messaggio' && (
+            <div className="campo">
+              <label htmlFor="codiceTgs">Codice promozione in cassa (TGS)</label>
+              <input id="codiceTgs" value={form.codiceTgs} onChange={(e) => setForm({ ...form, codiceTgs: e.target.value })} maxLength={50} placeholder="es. PROMO10" />
+              <p className="testo-secondario" style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>
+                La promozione va creata prima in TGS: qui indichi il suo codice, e quando il cliente la carica viene attivata sulla sua card in cassa. Senza codice si applica a mano dalla schermata operatore.
+              </p>
             </div>
           )}
 

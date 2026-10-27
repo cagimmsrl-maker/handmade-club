@@ -27,13 +27,13 @@ const esitoSchema = z
 // v2 — esito di una promozione caricata, creata in cassa.
 const esitoPromozioneSchema = z
   .object({
-    esito: z.enum(['creata', 'errore']),
+    esito: z.enum(['attivata', 'creata', 'errore']),
     codicePromozioneTgs: testo(50),
     messaggio: testo(500),
     elaboratoIl: dataIso,
   })
   .transform((d) => ({
-    esito: d.esito,
+    esito: d.esito === 'creata' ? 'attivata' : d.esito,
     codicePromozioneTgs: d.codicePromozioneTgs || null,
     messaggio: d.messaggio || null,
     elaboratoIl: d.elaboratoIl || null,

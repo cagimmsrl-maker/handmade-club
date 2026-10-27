@@ -14,19 +14,21 @@ function oraHm(v) { return v ? String(v).slice(0, 5) : null; }
 
 // GET /api/tgs/promozioni-da-sincronizzare?limite=50
 // Promo caricate dai clienti (già creati in cassa per questa sede), pubblicate,
-// non scadute, applicabili in cassa (non "messaggio"), destinate a questa sede
-// o a tutte, senza esito per questa sede. Una riga per (cliente, promo).
+// non scadute, con un CODICE PROMOZIONE TGS (la promo è definita in cassa;
+// qui si chiede solo di attivarla sulla card), destinate a questa sede o a
+// tutte, senza esito per questa sede. Una riga per (cliente, promo).
 async function promozioniDaSincronizzare(req, res, next) {
   try {
     const limite = Math.min(LIMITE_MAX, Math.max(1, parseInt(req.query.limite, 10) || LIMITE_DEFAULT));
     const { rows } = await pool.query(
       `SELECT pc.id, pc.caricata_il, t.codice_qr, s.tgs_codice_cliente,
               p.id AS promo_id, p.titolo, p.tipo, p.valore, p.prodotto, p.valido_dal, p.valido_al,
-              p.ora_inizio, p.ora_fine, p.giorni_settimana, p.usi_per_cliente,
+              p.ora_inizio, p.ora_fine, p.giorni_settimana, p.usi_per_cliente, p.codice_tgs,
               (SELECT count(*)::int FROM promozioni_utilizzi u WHERE u.promozione_id = p.id AND u.cliente_id = pc.cliente_id) AS usi
          FROM promozioni_clienti pc
          JOIN promozioni p ON p.id = pc.promozione_id
               AND p.stato = 'pubblicata' AND p.tipo <> 'messaggio' AND p.valido_al >= CURRENT_DATE
+              AND p.codice_tgs IS NOT NULL AND p.codice_tgs <> ''
               AND (p.target_sede_id IS NULL OR p.target_sede_id = $1)
          JOIN clienti c ON c.id = pc.cliente_id AND c.stato = 'attivo'
          JOIN tessere t ON t.cliente_id = c.id AND t.stato = 'attiva'
@@ -43,7 +45,8 @@ async function promozioniDaSincronizzare(req, res, next) {
         qrCode: r.codice_qr,
         codiceClienteTgs: r.tgs_codice_cliente || null,  // quello che TGS ci ha dato all'esito cliente
         caricataIl: isoConFuso(r.caricata_il),
-        promozione: {
+        codicePromozioneTgs: r.codice_tgs,              // la promozione definita in TGS da attivare sulla card
+        promozione: {                                    // solo informativo: la definizione vera è in TGS
           id: String(r.promo_id),
           titolo: String(r.titolo).slice(0, 100),
           tipo: r.tipo,                                 // sconto_percentuale | prezzo_fisso | omaggio
@@ -64,7 +67,8 @@ async function promozioniDaSincronizzare(req, res, next) {
   }
 }
 
-// POST /api/tgs/promozioni/:id/esito  { esito: creata|errore, codicePromozioneTgs, messaggio, elaboratoIl } → 204
+// POST /api/tgs/promozioni/:id/esito  { esito: attivata|errore, messaggio, elaboratoIl } → 204
+// ('creata' accettato come sinonimo di 'attivata' per compatibilità)
 async function esitoPromozione(req, res, next) {
   try {
     const pcId = parseInt(req.params.id, 10);

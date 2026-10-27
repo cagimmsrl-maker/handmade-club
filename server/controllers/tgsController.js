@@ -124,7 +124,7 @@ async function riepilogoAdmin(req, res, next) {
               (SELECT count(*)::int FROM tgs_sincronizzazioni x WHERE x.sede_id = s.id AND x.stato = 'errore') AS errori,
               (SELECT max(k.ultimo_uso_il) FROM tgs_chiavi_api k WHERE k.sede_id = s.id AND k.attiva) AS ultimo_contatto,
               (SELECT count(*)::int FROM tgs_chiavi_api k WHERE k.sede_id = s.id AND k.attiva) AS chiavi_attive,
-              (SELECT count(*)::int FROM tgs_sinc_promozioni x WHERE x.sede_id = s.id AND x.stato = 'creata') AS promo_create,
+              (SELECT count(*)::int FROM tgs_sinc_promozioni x WHERE x.sede_id = s.id AND x.stato = 'attivata') AS promo_attivate,
               (SELECT count(*)::int FROM tgs_sinc_promozioni x WHERE x.sede_id = s.id AND x.stato = 'errore') AS promo_errori,
               (SELECT count(*)::int FROM tgs_passaggi x WHERE x.sede_id = s.id) AS passaggi,
               (SELECT max(x.passato_il) FROM tgs_passaggi x WHERE x.sede_id = s.id) AS ultimo_passaggio

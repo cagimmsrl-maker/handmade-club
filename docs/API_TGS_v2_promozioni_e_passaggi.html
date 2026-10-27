@@ -31,19 +31,19 @@
 <body>
 <main>
   <h1>API fidelity Handmade Club – v2</h1>
-  <p class="sotto">Estensione della specifica "API clienti fidelity TGS v1" (26/10/2026): promozioni caricate dal cliente verso la cassa e passaggi in cassa verso l'app. CAR FOOD S.r.l. · Versione 2 · 27/10/2026. <strong>Già implementata e attiva lato app.</strong></p>
+  <p class="sotto">Estensione della specifica "API clienti fidelity TGS v1" (26/10/2026): attivazione sulla card delle promozioni caricate dal cliente e passaggi in cassa verso l'app. CAR FOOD S.r.l. · Versione 2 · 27/10/2026. <strong>Già implementata e attiva lato app.</strong></p>
 
   <h2>Come funziona</h2>
   <p>Stesso modello della v1: il servizio TGS accanto alla cassa chiama l'app, con la stessa chiave <code>X-Api-Key</code> del punto vendita, in HTTPS. Si aggiungono due flussi:</p>
   <ol>
-    <li><strong>Promozioni</strong> (app → cassa): il cliente carica una promozione in app; il servizio la legge e la crea in TGS collegata alla sua card, poi comunica l'esito.</li>
+    <li><strong>Promozioni</strong> (app → cassa): le promozioni sono <strong>definite in TGS</strong> con il loro codice. Nell'app ogni promozione pubblicata in bacheca riporta il codice TGS corrispondente. Quando il cliente la carica, il servizio legge la coppia (card, codice promozione TGS) e <strong>attiva quella promozione sulla card</strong>, poi comunica l'esito. L'app non crea né modifica promozioni in TGS.</li>
     <li><strong>Passaggi</strong> (cassa → app): quando la cassa legge il QR del cliente, il servizio comunica all'app lo scontrino e le promozioni applicate. Da lì l'app conta la visita, aggiorna il livello e segna le promozioni usate.</li>
   </ol>
   <pre class="flusso">App (server cloud)                                Servizio TGS sul punto vendita
   │                                                   │
   │  ◄── 3. GET promozioni da sincronizzare ──────────┤  ogni ~10 s
-  │  ─── promo caricate (per card già creata) ──────► │
-  │                                                   ├── crea la promo in TGS sulla card
+  │  ─── (card, codice promozione TGS) ─────────────► │
+  │                                                   ├── attiva la promo TGS sulla card
   │  ◄── 4. POST esito promozione ────────────────────┤
   │  ─── 204 ───────────────────────────────────────► │
   │                                                   │
@@ -60,7 +60,7 @@
 
   <h2>3. Promozioni da sincronizzare</h2>
   <div class="endpoint"><span class="metodo">GET</span><span class="percorso">/api/tgs/promozioni-da-sincronizzare?limite=50</span></div>
-  <p>Restituisce le promozioni caricate dai clienti per cui non è ancora arrivato un esito, dalla più vecchia, al massimo <code>limite</code> (predefinito 50). Solo promozioni pubblicate, non scadute, applicabili in cassa (le promozioni di solo messaggio non compaiono) e destinate a questo punto vendita o a tutti.</p>
+  <p>Restituisce le promozioni caricate dai clienti per cui non è ancora arrivato un esito, dalla più vecchia, al massimo <code>limite</code> (predefinito 50). Compaiono solo le promozioni che nell'app hanno un <strong>codice promozione TGS</strong>, pubblicate, non scadute, destinate a questo punto vendita o a tutti; il cliente risulta già creato in TGS per questo punto vendita.</p>
   <h3>Campi di ogni elemento</h3>
   <div class="tabella"><table>
     <thead><tr><th>Campo</th><th>Tipo</th><th>Regole</th></tr></thead>
@@ -69,7 +69,9 @@
       <tr><td>qrCode</td><td>stringa</td><td>QR del cliente, lo stesso della v1.</td></tr>
       <tr><td>codiceClienteTgs</td><td>stringa</td><td>Il codice cliente TGS comunicato nell'esito v1 (comodo per non rifare la ricerca). <code>null</code> se non disponibile.</td></tr>
       <tr><td>caricataIl</td><td>data e ora</td><td>Quando il cliente ha caricato la promozione in app.</td></tr>
-      <tr><td>promozione.id</td><td>stringa</td><td>ID della promozione (uguale per tutti i clienti che la caricano).</td></tr>
+      <tr><td>codicePromozioneTgs</td><td>stringa</td><td><strong>Il codice della promozione in TGS da attivare sulla card.</strong> È il dato operativo; il blocco <code>promozione</code> sotto è solo informativo.</td></tr>
+      <tr><td>promozione.*</td><td>oggetto</td><td><em>Informativo</em>: come l'app descrive la promozione al cliente (titolo, tipo, valore, prodotto, validità, fascia oraria, giorni, usi). La definizione che fa fede in cassa è quella di TGS con il codice sopra.</td></tr>
+      <tr><td>promozione.id</td><td>stringa</td><td>ID della promozione nell'app (uguale per tutti i clienti che la caricano).</td></tr>
       <tr><td>promozione.titolo</td><td>stringa</td><td>Max 100. Da usare come descrizione in TGS.</td></tr>
       <tr><td>promozione.tipo</td><td>stringa</td><td><code>sconto_percentuale</code>: sconto % sullo scontrino (<code>valore</code> = percentuale).<br><code>prezzo_fisso</code>: un articolo a prezzo fisso (<code>valore</code> = prezzo in euro, <code>prodotto</code> = descrizione articolo).<br><code>omaggio</code>: articolo in omaggio / 2x1 (<code>prodotto</code> = descrizione articolo).</td></tr>
       <tr><td>promozione.valore</td><td>numero</td><td>Vedi tipo. <code>null</code> per omaggio.</td></tr>
@@ -89,6 +91,7 @@
       "qrCode": "6BEB823D35A4",
       "codiceClienteTgs": "1LR99A01135",
       "caricataIl": "2026-10-27T11:46:52+01:00",
+      "codicePromozioneTgs": "PROMO10",
       "promozione": {
         "id": "7",
         "titolo": "Caffè -20%",
@@ -110,20 +113,18 @@
 
   <h2>4. Esito della promozione</h2>
   <div class="endpoint"><span class="metodo">POST</span><span class="percorso">/api/tgs/promozioni/{id}/esito</span></div>
-  <p>Una volta per ogni promozione caricata, dopo averla creata in TGS. Da quel momento non compare più nell'elenco del punto 3.</p>
+  <p>Una volta per ogni promozione caricata, dopo averla attivata sulla card in TGS. Da quel momento non compare più nell'elenco del punto 3.</p>
   <div class="tabella"><table>
     <thead><tr><th>Campo</th><th>Tipo</th><th>Quando</th><th>Significato</th></tr></thead>
     <tbody>
-      <tr><td>esito</td><td>stringa</td><td>sempre</td><td><code>creata</code>: promozione creata in TGS sulla card del cliente.<br><code>errore</code>: dati non accettabili (es. articolo non riconosciuto); non viene ritentata finché non interviene l'operatore dell'app.</td></tr>
-      <tr><td>codicePromozioneTgs</td><td>stringa</td><td>creata</td><td>Identificativo della promozione in TGS, se esiste.</td></tr>
+      <tr><td>esito</td><td>stringa</td><td>sempre</td><td><code>attivata</code>: promozione TGS attivata sulla card del cliente.<br><code>errore</code>: non attivabile (es. codice promozione inesistente in TGS, card non trovata); non viene ritentata finché non interviene l'operatore dell'app.</td></tr>
       <tr><td>messaggio</td><td>stringa</td><td>errore</td><td>Spiegazione leggibile per l'operatore dell'app.</td></tr>
       <tr><td>elaboratoIl</td><td>data e ora</td><td>sempre</td><td>Momento dell'elaborazione in TGS.</td></tr>
     </tbody>
   </table></div>
 <pre><code>POST /api/tgs/promozioni/184/esito
 {
-  "esito": "creata",
-  "codicePromozioneTgs": "PR000031",
+  "esito": "attivata",
   "elaboratoIl": "2026-10-27T11:47:05+01:00"
 }</code></pre>
   <p>Risposte: <code>204</code> registrato (anche se ripetuto); <code>401</code> chiave; <code>404</code> id inesistente; <code>422</code> corpo non valido.</p>
@@ -154,8 +155,8 @@
 
   <h2>Da concordare</h2>
   <ul>
-    <li><strong>Articoli.</strong> Per <code>prezzo_fisso</code> e <code>omaggio</code> l'app oggi manda la descrizione dell'articolo. Per l'applicazione automatica in cassa servirebbe il codice articolo TGS: proponiamo che ci forniate l'elenco articoli (codice + descrizione) o un'API per leggerlo, così l'app lo associa alla promozione quando viene creata.</li>
-    <li><strong>Archiviazione.</strong> Se una promozione viene archiviata in app prima della scadenza, oggi non lo comunichiamo: TGS la applica fino a <code>validoAl</code>. Se serve, aggiungiamo <code>GET /api/tgs/promozioni-revocate</code>.</li>
+    <li><strong>Elenco promozioni TGS.</strong> Per evitare errori di trascrizione del codice, sarebbe utile un'API (o un elenco) delle promozioni definite in TGS (codice + descrizione), così l'admin dell'app la sceglie da una lista invece di digitarla.</li>
+    <li><strong>Disattivazione.</strong> Se una promozione viene archiviata in app prima della scadenza, oggi non lo comunichiamo: la promozione resta attiva sulla card secondo le regole di TGS. Se serve, aggiungiamo <code>GET /api/tgs/promozioni-da-disattivare</code>.</li>
     <li><strong>Cliente già presente (dalla v1).</strong> Chiediamo che con esito <code>gia_presente</code> il QR dell'app venga comunque associato come nuova card al cliente esistente, altrimenti il QR non funziona in cassa per chi aveva già una card.</li>
   </ul>
 

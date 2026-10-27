@@ -185,14 +185,19 @@ camelCase); il codice la segue alla lettera, in `tgsController.js`, `tgs.schema.
   staff. Prepagate verso la cassa: fase successiva.
 - **v2 (27/10/2026, migrazione 010, `tgsPromozioniController.js`), proposta a TGS con
   `docs/API_TGS_v2_promozioni_e_passaggi.html`, già attiva lato app:**
-  `GET /api/tgs/promozioni-da-sincronizzare` (promo caricate da clienti già `creato`/`gia_presente`
-  in quella sede; pubblicate, non scadute, non `messaggio`, destinate alla sede o a tutte; id =
-  `promozioni_clienti.id`), `POST /api/tgs/promozioni/{id}/esito` (`creata|errore`, idempotente su
-  `tgs_sinc_promozioni (promozione_cliente_id, sede_id)`), `POST /api/tgs/passaggi` (scontrino con QR:
+  **Le promozioni si definiscono in TGS**: l'app non le crea in cassa, chiede di ATTIVARE sulla card
+  la promozione TGS con il codice che l'admin ha indicato nella promo (`promozioni.codice_tgs`,
+  migrazione 011; senza codice la promo resta manuale dalla schermata operatore).
+  `GET /api/tgs/promozioni-da-sincronizzare` (promo caricate con `codice_tgs`, da clienti già
+  `creato`/`gia_presente` in quella sede; pubblicate, non scadute, destinate alla sede o a tutte;
+  id = `promozioni_clienti.id`; campo operativo `codicePromozioneTgs`, blocco `promozione` solo
+  informativo), `POST /api/tgs/promozioni/{id}/esito` (`attivata|errore`, `creata` accettato come
+  sinonimo; idempotente su `tgs_sinc_promozioni (promozione_cliente_id, sede_id)`), `POST /api/tgs/passaggi` (scontrino con QR:
   crea la `scansione` con la stessa regola 2h della schermata operatore, ricalcola il livello, scrive
   `promozioni_utilizzi` per le `promozioniUsate` del cliente; idempotente su `tgs_passaggi (sede_id,
   numero_scontrino)`; `passatoIl` è la data che conta). Con i passaggi attivi il tablet operatore non
-  serve più in cassa. Aperti con TGS: codici articolo per prezzo_fisso/omaggio; revoca promo archiviate.
+  serve più in cassa. Aperti con TGS: elenco promozioni TGS (codice+descrizione) per sceglierle da lista;
+  disattivazione delle promo archiviate.
 - Aperto con TGS: con esito `gia_presente` il QR dell'app oggi NON diventa card del cliente
   esistente; da decidere.
 
