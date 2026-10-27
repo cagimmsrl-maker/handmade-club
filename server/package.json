@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "crea-admin": "node scripts/creaAdmin.js"
+    "crea-admin": "node scripts/creaAdmin.js",
+    "crea-chiave-tgs": "node scripts/creaChiaveTgs.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

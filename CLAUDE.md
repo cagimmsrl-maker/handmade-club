@@ -159,7 +159,30 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
 - Le notifiche push per avvisare i clienti delle promo arrivano in una fase successiva (richiedono
   HTTPS su dominio pubblico).
 
-## Integrazione TGS (ossatura dal 27/10/2026, spenta finché `TGS_ENABLED=true`)
+## Integrazione TGS — modello "pull" (dal 27/10/2026, migrazione 008) — QUELLO IN USO
+
+La sera del 26/10 TGS ha ribaltato il verso: **il loro servizio accanto alla cassa chiama la nostra
+app ogni ~10 s**; nel punto vendita non si apre nessuna porta (la richiesta a Connesi per la 9443
+è superata). Noi esponiamo, autenticati con **`X-Api-Key` una per punto vendita**:
+- `GET  /api/tgs/clienti-da-sincronizzare?limite=100` → `{ sede, clienti: [{ id, nome, cognome,
+  telefono, email, qr, data }] }`: clienti attivi con tessera attiva senza esito per QUELLA sede.
+  Lunghezze TGS: telefono 15, nome/cognome 100, email 100 (se più lunga → null, mai tagliata), QR 50.
+- `POST /api/tgs/clienti/{id}/esito` `{ esito: creato|gia_presente|errore, codice_cliente_tgs,
+  codice_card, numero_pay, messaggio }` (accetta anche camelCase) → **idempotente**: upsert su
+  `tgs_sincronizzazioni (cliente_id, sede_id)`, `esiti_ricevuti` conta le ripetizioni.
+  Gli `errore` escono dalla lista (niente loop); dall'admin `POST
+  /admin/tgs/sincronizzazione/:clienteId/riprova?sede=ID` li rimette in coda.
+- Chiavi: `npm run crea-chiave-tgs` (sede → chiave `hc_…` mostrata UNA volta; nel DB solo l'hash
+  SHA-256, `tgs_chiavi_api`, `ultimo_uso_il` = "il servizio TGS sta girando"). Middleware
+  `authTgs`. Riepilogo per sede: `GET /admin/tgs/sincronizzazione`.
+- **I nomi dei campi JSON sono quelli della mail di TGS**; se la loro documentazione allegata
+  usa nomi diversi, si allineano in `tgsController.js` / `tgs.schema.js` (unico punto).
+- Promozioni verso la cassa: non ancora nel modello pull (fase successiva, da concordare con TGS).
+
+## Integrazione TGS — ossatura "push" (27/10/2026, DORMIENTE: `TGS_ENABLED` resta false)
+
+Costruita prima della mail di TGS, quando si pensava di chiamare noi il loro WebService. Resta nel
+repo, spenta, per la fase promozioni/prepagate se servirà chiamare la cassa direttamente.
 
 **Cosa sappiamo della cassa** (ricognizione sul server di Fiano, 27/10/2026): il WebService TGS
 (`websrv.exe`, ASP.NET/Kestrel, `C:\Progetti_Retail\WebService`) gira su `192.168.10.10:9010`;

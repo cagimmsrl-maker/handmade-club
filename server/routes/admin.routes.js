@@ -7,6 +7,7 @@ const adminParametriController = require('../controllers/adminParametriControlle
 const adminDashboardController = require('../controllers/adminDashboardController');
 const adminClientiController = require('../controllers/adminClientiController');
 const adminPromozioniController = require('../controllers/adminPromozioniController');
+const tgsController = require('../controllers/tgsController');
 const authAdmin = require('../middleware/authAdmin');
 const validate = require('../middleware/validate');
 const multer = require('multer');
@@ -72,6 +73,9 @@ router.post('/promozioni/:id/immagine', conImmagine, adminPromozioniController.c
 router.delete('/promozioni/:id/immagine', adminPromozioniController.rimuoviImmagine);
 
 router.get('/clienti', adminClientiController.elenco);
+
+router.get('/tgs/sincronizzazione', tgsController.riepilogoAdmin);
+router.post('/tgs/sincronizzazione/:clienteId/riprova', tgsController.riprovaAdmin);
 router.post('/clienti/:id/blocca-tessera', adminClientiController.bloccaTessera);
 
 module.exports = router;

@@ -3,7 +3,7 @@ const { z } = require('zod');
 const profiloSchema = z.object({
   nome: z.string().trim().min(1, 'Il nome è obbligatorio').max(100),
   cognome: z.string().trim().max(100).optional().nullable().or(z.literal('')),
-  email: z.string().trim().email('Email non valida').max(200).optional().nullable().or(z.literal('')),
+  email: z.string().trim().email('Email non valida').max(100).optional().nullable().or(z.literal('')),
   dataNascita: z.string().date().optional().nullable().or(z.literal('')),
 });
 

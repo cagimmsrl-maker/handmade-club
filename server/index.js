@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth.routes');
 const clienteRoutes = require('./routes/cliente.routes');
 const operatoreRoutes = require('./routes/operatore.routes');
 const adminRoutes = require('./routes/admin.routes');
+const tgsRoutes = require('./routes/tgs.routes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -22,6 +23,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/cliente', clienteRoutes);
 app.use('/api/operatore', operatoreRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/tgs', tgsRoutes); // chiamate dal servizio TGS accanto alla cassa (X-Api-Key)
 
 app.get('/api/salute', (req, res) => res.json({ ok: true }));
 
