@@ -159,25 +159,32 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
 - Le notifiche push per avvisare i clienti delle promo arrivano in una fase successiva (richiedono
   HTTPS su dominio pubblico).
 
-## Integrazione TGS — modello "pull" (dal 27/10/2026, migrazione 008) — QUELLO IN USO
+## Integrazione TGS — modello "pull" (specifica TGS v1 del 26/10/2026, migrazioni 008-009) — IN USO
 
-La sera del 26/10 TGS ha ribaltato il verso: **il loro servizio accanto alla cassa chiama la nostra
-app ogni ~10 s**; nel punto vendita non si apre nessuna porta (la richiesta a Connesi per la 9443
-è superata). Noi esponiamo, autenticati con **`X-Api-Key` una per punto vendita**:
-- `GET  /api/tgs/clienti-da-sincronizzare?limite=100` → `{ sede, clienti: [{ id, nome, cognome,
-  telefono, email, qr, data }] }`: clienti attivi con tessera attiva senza esito per QUELLA sede.
-  Lunghezze TGS: telefono 15, nome/cognome 100, email 100 (se più lunga → null, mai tagliata), QR 50.
-- `POST /api/tgs/clienti/{id}/esito` `{ esito: creato|gia_presente|errore, codice_cliente_tgs,
-  codice_card, numero_pay, messaggio }` (accetta anche camelCase) → **idempotente**: upsert su
-  `tgs_sincronizzazioni (cliente_id, sede_id)`, `esiti_ricevuti` conta le ripetizioni.
-  Gli `errore` escono dalla lista (niente loop); dall'admin `POST
-  /admin/tgs/sincronizzazione/:clienteId/riprova?sede=ID` li rimette in coda.
-- Chiavi: `npm run crea-chiave-tgs` (sede → chiave `hc_…` mostrata UNA volta; nel DB solo l'hash
-  SHA-256, `tgs_chiavi_api`, `ultimo_uso_il` = "il servizio TGS sta girando"). Middleware
-  `authTgs`. Riepilogo per sede: `GET /admin/tgs/sincronizzazione`.
-- **I nomi dei campi JSON sono quelli della mail di TGS**; se la loro documentazione allegata
-  usa nomi diversi, si allineano in `tgsController.js` / `tgs.schema.js` (unico punto).
-- Promozioni verso la cassa: non ancora nel modello pull (fase successiva, da concordare con TGS).
+**Il servizio TGS accanto alla cassa chiama la nostra app ogni ~10 s**; nel punto vendita non si apre
+nessuna porta. La specifica ufficiale è il documento HTML "API clienti fidelity TGS v1" (campi in
+camelCase); il codice la segue alla lettera, in `tgsController.js`, `tgs.schema.js`, `tgs.routes.js`:
+- `GET  /api/tgs/clienti-da-sincronizzare?limite=50` → `{ clienti: [{ id (stringa), nome, cognome,
+  telefono, email|null, qrCode, registratoIl }] }` — clienti attivi con tessera attiva senza esito per
+  la sede della chiave, dal più vecchio. Limiti TGS: id 64, nome/cognome 100, telefono 15 (solo cifre
+  e `+`; **in uscita sempre internazionale `+39…`**, perché TGS riconosce i doppioni dal telefono),
+  email 100 (più lunga → null), QR 50. `cognome` è obbligatorio per TGS: se manca si manda `""`
+  (da verificare con TGS se lo accettano). Date ISO 8601 con fuso di Roma (`isoConFuso`).
+- `POST /api/tgs/clienti/{id}/esito` `{ esito: creato|gia_presente|errore, codiceClienteTgs,
+  codiceCardTgs, barcodeCard, messaggio, elaboratoIl }` → **204** vuoto; 401 chiave; 404 cliente
+  inesistente; **422** corpo non valido. **Idempotente**: upsert su `tgs_sincronizzazioni
+  (cliente_id, sede_id)`. Gli `errore` escono dalla lista (niente loop); dall'admin
+  `POST /admin/tgs/sincronizzazione/:clienteId/riprova?sede=ID` li rimette in coda.
+- Chiavi `X-Api-Key` una per punto vendita: `npm run crea-chiave-tgs` (chiave `hc_…` mostrata UNA
+  volta; nel DB solo l'hash SHA-256). Revoca: `UPDATE tgs_chiavi_api SET attiva=false`. Filtro IP
+  facoltativo per chiave (`ip_consentiti INET[]`, NULL = tutti): Fiano ha IP statico 5.154.199.20,
+  da impostare quando il collegamento è collaudato. `ultimo_uso_il` = "il servizio TGS sta girando".
+- Admin: riepilogo per sede `GET /admin/tgs/sincronizzazione`; nella lista clienti la colonna
+  "Cassa (TGS)" mostra per sede creato/già presente/errore con messaggio e numero card.
+- Nessun ambiente di prova separato: il collaudo con TGS si fa sulla sede reale con i clienti dello
+  staff. Promozioni e prepagate verso la cassa: fase successiva, da concordare con TGS.
+- Aperto con TGS: con esito `gia_presente` il QR dell'app oggi NON diventa card del cliente
+  esistente; da decidere.
 
 ## Integrazione TGS — ossatura "push" (27/10/2026, DORMIENTE: `TGS_ENABLED` resta false)
 

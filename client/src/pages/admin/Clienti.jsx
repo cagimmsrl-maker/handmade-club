@@ -45,7 +45,7 @@ export default function Clienti() {
         <table className="tabella-admin">
           <thead>
             <tr>
-              <th>Nome</th><th>Telefono</th><th>Livello</th><th>Tessera</th><th></th>
+              <th>Nome</th><th>Telefono</th><th>Livello</th><th>Tessera</th><th>Cassa (TGS)</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -55,6 +55,16 @@ export default function Clienti() {
                 <td>{c.telefono}</td>
                 <td>{c.livello_nome || '—'}</td>
                 <td>{c.tessera_stato || '—'}</td>
+                <td>
+                  {(!c.tgs || c.tgs.length === 0) && <span className="testo-secondario">in attesa</span>}
+                  {(c.tgs || []).map((t) => (
+                    <div key={t.sede} title={t.messaggio || ''} style={{ whiteSpace: 'nowrap' }}>
+                      {t.sede}: {{ creato: 'creato ✓', gia_presente: 'già presente', errore: 'errore ✗' }[t.stato] || t.stato}
+                      {t.card ? ` · ${t.card}` : ''}
+                      {t.stato === 'errore' && t.messaggio ? <span className="testo-secondario"> — {t.messaggio}</span> : null}
+                    </div>
+                  ))}
+                </td>
                 <td>
                   {c.tessera_stato === 'attiva' && (
                     <button className="link-testo" onClick={() => bloccaTessera(c.id)}>Blocca tessera</button>

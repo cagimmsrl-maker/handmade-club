@@ -6,7 +6,9 @@ async function elenco(req, res, next) {
     const filtro = ricerca ? `%${ricerca}%` : '%';
     const { rows } = await pool.query(
       `SELECT c.id, c.nome, c.cognome, c.telefono, c.stato,
-              l.nome AS livello_nome, t.stato AS tessera_stato
+              l.nome AS livello_nome, t.stato AS tessera_stato,
+              COALESCE((SELECT json_agg(json_build_object('sede', s.nome, 'stato', x.stato, 'messaggio', x.messaggio, 'card', x.tgs_numero_pay) ORDER BY s.nome)
+                          FROM tgs_sincronizzazioni x JOIN sedi s ON s.id = x.sede_id WHERE x.cliente_id = c.id), '[]'::json) AS tgs
        FROM clienti c
        LEFT JOIN livelli l ON l.id = c.livello_id
        LEFT JOIN tessere t ON t.cliente_id = c.id AND t.stato != 'revocata'

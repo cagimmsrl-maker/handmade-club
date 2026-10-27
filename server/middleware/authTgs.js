@@ -19,7 +19,7 @@ module.exports = async function authTgs(req, res, next) {
   try {
     const hash = hashChiave(chiave);
     const { rows } = await pool.query(
-      `SELECT k.id, k.sede_id, k.chiave_hash, s.nome AS sede_nome
+      `SELECT k.id, k.sede_id, k.chiave_hash, k.ip_consentiti, s.nome AS sede_nome
          FROM tgs_chiavi_api k JOIN sedi s ON s.id = k.sede_id
         WHERE k.chiave_hash = $1 AND k.attiva = true AND s.attiva = true`,
       [hash]
@@ -27,6 +27,11 @@ module.exports = async function authTgs(req, res, next) {
     const k = rows[0];
     const ok = k && crypto.timingSafeEqual(Buffer.from(k.chiave_hash), Buffer.from(hash));
     if (!ok) return res.status(401).json({ errore: 'Chiave API mancante o non valida.' });
+    // Filtro IP facoltativo per chiave (NULL = qualunque). req.ip è quello reale: trust proxy 1.
+    if (k.ip_consentiti && k.ip_consentiti.length > 0 && !k.ip_consentiti.includes(req.ip)) {
+      console.error(`[tgs] chiave ${k.id} usata da IP non consentito`);
+      return res.status(401).json({ errore: 'Chiave API mancante o non valida.' });
+    }
     req.tgs = { chiaveId: k.id, sedeId: k.sede_id, sedeNome: k.sede_nome };
     // Traccia dell'ultimo uso (per vedere dall'admin se il servizio TGS sta girando).
     pool.query('UPDATE tgs_chiavi_api SET ultimo_uso_il = now() WHERE id = $1', [k.id]).catch(() => {});

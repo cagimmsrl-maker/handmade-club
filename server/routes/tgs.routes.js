@@ -1,7 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const authTgs = require('../middleware/authTgs');
-const validate = require('../middleware/validate');
 const { esitoSchema } = require('../schemas/tgs.schema');
 const tgsController = require('../controllers/tgsController');
 
@@ -13,7 +12,20 @@ router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, standardHeaders: tru
   message: { errore: 'Troppe richieste.' } }));
 router.use(authTgs);
 
+// La specifica TGS vuole 422 (non 400) per corpo non valido.
+function validaEsito(req, res, next) {
+  const r = esitoSchema.safeParse(req.body);
+  if (!r.success) {
+    return res.status(422).json({
+      errore: 'Corpo non valido.',
+      dettagli: r.error.issues.map((i) => ({ campo: i.path.join('.'), messaggio: i.message })),
+    });
+  }
+  req.body = r.data;
+  next();
+}
+
 router.get('/clienti-da-sincronizzare', tgsController.clientiDaSincronizzare);
-router.post('/clienti/:id/esito', validate(esitoSchema), tgsController.esito);
+router.post('/clienti/:id/esito', validaEsito, tgsController.esito);
 
 module.exports = router;
