@@ -19,6 +19,12 @@ jobs:
 
       - name: Sedi attive e stato chiavi TGS (sola lettura)
         run: |
+          cat > /tmp/cmd.sh <<'SCRIPT'
+          Q() { sudo -u postgres psql -d handmade_clienti -Atc "$1"; }
+          echo "--- sedi ---";        Q "select id, nome, attiva from sedi order by id"
+          echo "--- chiavi TGS ---";  Q "select k.id, s.nome, k.etichetta, k.attiva, k.ultimo_uso_il from tgs_chiavi_api k join sedi s on s.id=k.sede_id order by k.id"
+          echo "--- clienti ---";     Q "select stato, count(*) from clienti group by stato"
+          echo "--- tessere attive ---"; Q "select count(*) from tessere where stato='attiva'"
+          SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
-            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            'sudo -u postgres psql -d handmade_clienti -Atc "select id, nome, attiva from sedi order by id"; echo "--- chiavi TGS ---"; sudo -u postgres psql -d handmade_clienti -Atc "select k.id, s.nome, k.etichetta, k.attiva, k.ultimo_uso_il from tgs_chiavi_api k join sedi s on s.id=k.sede_id order by k.id"; echo "--- clienti attivi ---"; sudo -u postgres psql -d handmade_clienti -Atc "select count(*) from clienti where stato=$$attivo$$"'
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -s' < /tmp/cmd.sh
