@@ -17,14 +17,52 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Sedi attive e stato chiavi TGS (sola lettura)
+      - name: Prepara Fiano (sede, chiave TGS in file root-only, controllo SMS)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
+          set -e
+          cd /var/www/handmade-club/server
           Q() { sudo -u postgres psql -d handmade_clienti -Atc "$1"; }
-          echo "--- sedi ---";        Q "select id, nome, attiva from sedi order by id"
-          echo "--- chiavi TGS ---";  Q "select k.id, s.nome, k.etichetta, k.attiva, k.ultimo_uso_il from tgs_chiavi_api k join sedi s on s.id=k.sede_id order by k.id"
-          echo "--- clienti ---";     Q "select stato, count(*) from clienti group by stato"
-          echo "--- tessere attive ---"; Q "select count(*) from tessere where stato='attiva'"
+          OUT=/root/fiano-accessi.txt; umask 077
+          echo "== Handmade Club - accessi Fiano (generato $(date '+%d/%m/%Y %H:%M')) ==" > "$OUT"
+          # 1. sede Fiano (solo se manca)
+          SEDE=$(Q "select id from sedi where lower(nome)='fiano' limit 1")
+          if [ -z "$SEDE" ]; then
+            PIN=$(shuf -i 100000-999999 -n1)
+            Q "insert into sedi(nome,indirizzo,pin_operatore,attiva) values('Fiano','Fiano Romano (RM)','$PIN',true)" >/dev/null
+            SEDE=$(Q "select id from sedi where lower(nome)='fiano' limit 1")
+            echo "PIN operatore sede Fiano (per /operatore): $PIN" >> "$OUT"
+            echo "sede Fiano creata (id $SEDE)"
+          else
+            echo "PIN operatore: quello gia' impostato in /admin -> Sedi" >> "$OUT"
+            echo "sede Fiano gia' presente (id $SEDE)"
+          fi
+          # 2. chiave TGS (solo se non ce n'e' una attiva)
+          if [ "$(Q "select count(*) from tgs_chiavi_api where sede_id=$SEDE and attiva")" = "0" ]; then
+            echo "" >> "$OUT"
+            echo "$SEDE" | npm run -s crea-chiave-tgs >> "$OUT" 2>&1
+            echo "chiave TGS creata"
+          else
+            echo "chiave TGS: gia' esistente, non rigenerata" >> "$OUT"
+            echo "chiave TGS gia' esistente"
+          fi
+          chmod 600 "$OUT"
+          echo "file scritto: $OUT ($(wc -l < "$OUT") righe, solo root)"
+          # 3. SMS: configurazione e crediti (nessun segreto in uscita)
+          node -e '
+          require("dotenv").config({ path: "/var/www/handmade-club/server/.env" });
+          (async () => {
+            const b = "https://api.skebby.it/API/v1.0/REST";
+            console.log("SMS_PROVIDER=" + process.env.SMS_PROVIDER + " SKEBBY_MESSAGE_TYPE=" + process.env.SKEBBY_MESSAGE_TYPE + " SENDER=" + process.env.SKEBBY_SENDER);
+            if (process.env.SMS_PROVIDER !== "skebby") return;
+            const r = await fetch(`${b}/login?username=${encodeURIComponent(process.env.SKEBBY_USER)}&password=${encodeURIComponent(process.env.SKEBBY_PASSWORD)}`);
+            if (!r.ok) { console.log("login Skebby: HTTP " + r.status); return; }
+            const [u, s] = (await r.text()).trim().split(";");
+            const st = await fetch(`${b}/status?getMoney=true`, { headers: { user_key: u, Session_key: s } });
+            const j = await st.json();
+            console.log("crediti Skebby: " + JSON.stringify({ money: j.money, sms: j.sms }));
+          })().catch((e) => console.log("controllo SMS: " + e.message));
+          '
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -s' < /tmp/cmd.sh
