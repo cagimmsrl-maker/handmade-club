@@ -17,17 +17,34 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Allinea la promo di apertura (lettura, aggiornamento, rilettura)
+      - name: Archivia le promo di prova e crea la promo automatica di apertura
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           Q() { sudo -u postgres psql -d handmade_clienti -Atc "$1"; }
-          echo "--- promo prima ---"; Q "select id, stato, tipo, valore, titolo, coalesce(descrizione,''), valido_dal, valido_al, coalesce(codice_tgs,''), coalesce(immagine,'') <> '' as foto from promozioni order by id"
+          echo "--- promo prima ---"; Q "select id, stato, tipo, valore, titolo, valido_dal, valido_al, automatica, coalesce(immagine,'') from promozioni order by id"
           N=$(Q "select count(*) from promozioni where stato <> 'archiviata'")
-          if [ "$N" = "1" ]; then
-            Q "update promozioni set titolo='Sconto 15% su tutto', descrizione='Benvenuto a Fiano! 15% di sconto su tutto quello che prendi, fino all''8 novembre 2026. Escluse bottiglie di vino e bollicine.', tipo='sconto_percentuale', valore=15, prodotto=null, valido_al='2026-11-08', updated_at=now() where stato <> 'archiviata'"
-            echo "--- promo dopo ---"; Q "select id, stato, tipo, valore, titolo, coalesce(descrizione,''), valido_dal, valido_al from promozioni order by id"
+          if [ "$N" = "2" ] && [ "$(Q "select count(*) from promozioni where id in (1,2) and stato='pubblicata'")" = "2" ]; then
+            sudo -u postgres psql -d handmade_clienti -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          UPDATE promozioni SET stato='archiviata', updated_at=now() WHERE id IN (1,2);
+          INSERT INTO promozioni (titolo, descrizione, tipo, valore, valido_dal, valido_al, target_sede_id, usi_per_cliente, stato, pubblicata_il, immagine, automatica)
+          VALUES ('Nuova apertura Fiano Romano: −15% per te',
+                  'Benvenuto a Fiano! Per festeggiare la nuova apertura, ai possessori della tessera Handmade Club il 15% di sconto su tutto quello che prendi, fino all''8 novembre 2026. Escluse bottiglie di vino e bollicine.',
+                  'sconto_percentuale', 15, '2026-10-27', '2026-11-08', 3, NULL, 'pubblicata', now(),
+                  (SELECT immagine FROM promozioni WHERE id = 1), true);
+          INSERT INTO promozioni_clienti (promozione_id, cliente_id)
+          SELECT p.id, c.id FROM promozioni p
+            JOIN clienti c ON c.stato = 'attivo'
+            JOIN tessere t ON t.cliente_id = c.id AND t.stato = 'attiva'
+           WHERE p.automatica = true AND p.stato = 'pubblicata'
+          ON CONFLICT (promozione_id, cliente_id) DO NOTHING;
+          COMMIT;
+          SQL
+            echo "--- promo dopo ---"; Q "select id, stato, tipo, valore, titolo, valido_dal, valido_al, target_sede_id, usi_per_cliente, automatica, coalesce(immagine,'') from promozioni order by id"
+            echo "--- caricamenti ---"; Q "select promozione_id, count(*) from promozioni_clienti group by 1 order by 1"
+            echo "--- clienti attivi con tessera ---"; Q "select count(*) from clienti c join tessere t on t.cliente_id=c.id and t.stato='attiva' where c.stato='attivo'"
           else
-            echo "ATTENZIONE: trovate $N promo non archiviate, non tocco nulla"
+            echo "ATTENZIONE: stato inatteso ($N promo non archiviate), non tocco nulla"
           fi
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
