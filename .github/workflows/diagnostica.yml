@@ -17,52 +17,16 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Prepara Fiano (sede, chiave TGS in file root-only, controllo SMS)
+      - name: Attivita TGS sul server (sola lettura)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
-          set -e
-          cd /var/www/handmade-club/server
           Q() { sudo -u postgres psql -d handmade_clienti -Atc "$1"; }
-          OUT=/root/fiano-accessi.txt; umask 077
-          echo "== Handmade Club - accessi Fiano (generato $(date '+%d/%m/%Y %H:%M')) ==" > "$OUT"
-          # 1. sede Fiano (solo se manca)
-          SEDE=$(Q "select id from sedi where lower(nome)='fiano' limit 1")
-          if [ -z "$SEDE" ]; then
-            PIN=$(shuf -i 100000-999999 -n1)
-            Q "insert into sedi(nome,indirizzo,pin_operatore,attiva) values('Fiano','Fiano Romano (RM)','$PIN',true)" >/dev/null
-            SEDE=$(Q "select id from sedi where lower(nome)='fiano' limit 1")
-            echo "PIN operatore sede Fiano (per /operatore): $PIN" >> "$OUT"
-            echo "sede Fiano creata (id $SEDE)"
-          else
-            echo "PIN operatore: quello gia' impostato in /admin -> Sedi" >> "$OUT"
-            echo "sede Fiano gia' presente (id $SEDE)"
-          fi
-          # 2. chiave TGS (solo se non ce n'e' una attiva)
-          if [ "$(Q "select count(*) from tgs_chiavi_api where sede_id=$SEDE and attiva")" = "0" ]; then
-            echo "" >> "$OUT"
-            echo "$SEDE" | npm run -s crea-chiave-tgs >> "$OUT" 2>&1
-            echo "chiave TGS creata"
-          else
-            echo "chiave TGS: gia' esistente, non rigenerata" >> "$OUT"
-            echo "chiave TGS gia' esistente"
-          fi
-          chmod 600 "$OUT"
-          echo "file scritto: $OUT ($(wc -l < "$OUT") righe, solo root)"
-          # 3. SMS: configurazione e crediti (nessun segreto in uscita)
-          node -e '
-          require("dotenv").config({ path: "/var/www/handmade-club/server/.env" });
-          (async () => {
-            const b = "https://api.skebby.it/API/v1.0/REST";
-            console.log("SMS_PROVIDER=" + process.env.SMS_PROVIDER + " SKEBBY_MESSAGE_TYPE=" + process.env.SKEBBY_MESSAGE_TYPE + " SENDER=" + process.env.SKEBBY_SENDER);
-            if (process.env.SMS_PROVIDER !== "skebby") return;
-            const r = await fetch(`${b}/login?username=${encodeURIComponent(process.env.SKEBBY_USER)}&password=${encodeURIComponent(process.env.SKEBBY_PASSWORD)}`);
-            if (!r.ok) { console.log("login Skebby: HTTP " + r.status); return; }
-            const [u, s] = (await r.text()).trim().split(";");
-            const st = await fetch(`${b}/status?getMoney=true`, { headers: { user_key: u, Session_key: s } });
-            const j = await st.json();
-            console.log("crediti Skebby: " + JSON.stringify({ money: j.money, sms: j.sms }));
-          })().catch((e) => console.log("controllo SMS: " + e.message));
-          '
+          echo "--- chiavi: ultimo uso ---"; Q "select s.nome, k.attiva, coalesce(to_char(k.ultimo_uso_il at time zone 'Europe/Rome','DD/MM HH24:MI:SS'),'mai') from tgs_chiavi_api k join sedi s on s.id=k.sede_id"
+          echo "--- esiti clienti per stato ---"; Q "select s.nome, x.stato, count(*) from tgs_sincronizzazioni x join sedi s on s.id=x.sede_id group by 1,2"
+          echo "--- clienti attivi / in attesa ---"; Q "select count(*) filter (where c.stato='attivo') as attivi, count(*) filter (where c.stato='attivo' and not exists (select 1 from tgs_sincronizzazioni x where x.cliente_id=c.id)) as in_attesa from clienti c"
+          echo "--- richieste /api/tgs negli ultimi log nginx (ultime 10) ---"; grep -h "/api/tgs/" /var/log/nginx/access.log 2>/dev/null | tail -10 | sed -E 's/^([0-9.]+) .*\[([^]]+)\] "([A-Z]+) ([^ ]+)[^"]*" ([0-9]+).*/\2  \3 \4 -> \5  da \1/' || true
+          echo "--- totale richieste /api/tgs oggi ---"; grep -c "/api/tgs/" /var/log/nginx/access.log 2>/dev/null || echo 0
+          echo "--- errori app recenti ---"; pm2 logs handmade-club --err --lines 5 --nostream 2>/dev/null | grep -v "^\s*$" | tail -5 || true
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -s' < /tmp/cmd.sh
