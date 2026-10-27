@@ -159,12 +159,36 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
 - Le notifiche push per avvisare i clienti delle promo arrivano in una fase successiva (richiedono
   HTTPS su dominio pubblico).
 
-## Integrazione TGS (futura, non in Tappa 1)
+## Integrazione TGS (ossatura dal 27/10/2026, spenta finché `TGS_ENABLED=true`)
 
-TGS Retail ha confermato la disponibilità di API. Quando arriverà la documentazione:
-- l'integrazione vivrà in `server/services/tgs/`
-- nessuna chiamata TGS deve bloccare il flusso di scansione (fail-open: se TGS non risponde,
-  la scansione va comunque a buon fine e lo sconto si applica a mano)
+**Cosa sappiamo della cassa** (ricognizione sul server di Fiano, 27/10/2026): il WebService TGS
+(`websrv.exe`, ASP.NET/Kestrel, `C:\Progetti_Retail\WebService`) gira su `192.168.10.10:9010`;
+autenticazione JWT Bearer; il modulo `Fidelity.dll` espone **GetCustomer, InsertUpdateCustomer,
+AddFidelity, GetValueFidelity, InsertValueFidelity**. Rete: server `192.168.10.10` → router Kinetic
+`192.168.10.1` (MAC 50-FF-20-FE-66-AD) → FRITZ!Box Connesi `192.168.1.1` → IP pubblico
+`5.154.199.20`. Inoltro previsto: `5.154.199.20:9443` → Kinetic → `192.168.10.10:9010`. La
+`192.168.192.160` è la rete interna delle casse: non c'entra. La `8443` pubblica è il FRITZ, non TGS.
+**Percorsi esatti, metodi, nomi dei campi ed endpoint di login sono ipotesi** (marcate
+`DA CONFERMARE CON TGS` in `fidelity.js` e `client.js`) finché TGS non manda specifica e credenziali.
+Non ricavarli per tentativi dal servizio o dalle DLL: si chiedono a TGS.
+
+**Struttura** (`server/services/tgs/`): `config.js` (env `TGS_*`, tutto spento di default),
+`client.js` (login → token, Bearer, ri-login su 401, timeout corto, certificato autofirmato
+accettato SOLO per impronta `TGS_CERT_FINGERPRINT` — mai `rejectUnauthorized=false`),
+`fidelity.js` (le 5 operazioni: unico file TGS-specifico), `coda.js` (tabella `tgs_eventi`,
+migrazione 007: eventi `cliente_upsert | promo_caricata | scansione`, lavoratore ogni 15 s, un
+evento alla volta in ordine, backoff 30s→2h, max 12 tentativi; 4xx = `fallito` subito, 5xx/rete =
+si ritenta; cassa irraggiungibile = il giro si ferma), `index.js` (facciata).
+**Agganci**: `authController` (registra/completaProfilo) e `clienteController.aggiornaProfilo` →
+`clienteCreatoOAggiornato`; `clienteController.caricaPromozione` → `promoCaricata`;
+`cassaService.registraScansione` → `scansione`. Tutti fail-open: `accoda()` non lancia mai e con
+TGS spento non scrive nemmeno. Le promo `messaggio` non vanno in cassa. I dati del cliente si
+rileggono al momento dell'invio (stato attuale, non quello di quando è stato accodato).
+**Accensione**: nel `.env` `TGS_ENABLED=true`, `TGS_BASE_URL`, `TGS_USER`, `TGS_PASSWORD`,
+`TGS_CERT_FINGERPRINT`, eventuali `TGS_PATH_*`/`TGS_LOGIN_PATH` con i valori confermati, poi
+`pm2 restart handmade-club --update-env`; `tgs.prova()` fa solo il login, `tgs.stato()` riassume la coda.
+Prepagate (`GetValueFidelity`/`InsertValueFidelity` con tipo `ricarica`) e reparti IVA della cassa:
+fase successiva.
 
 ## Convenzioni di codice
 

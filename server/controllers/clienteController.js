@@ -4,6 +4,7 @@ const livelloService = require('../services/livelloService');
 const promozioniService = require('../services/promozioniService');
 const otpService = require('../services/otpService');
 const { INFORMATIVA_VERSIONE, TITOLARE } = require('../config/privacy');
+const tgs = require('../services/tgs');
 
 async function me(req, res, next) {
   try {
@@ -103,6 +104,7 @@ async function caricaPromozione(req, res, next) {
       return res.status(403).json({ errore: 'Per caricare le promozioni verifica prima il tuo numero.', codice: 'VERIFICA_RICHIESTA' });
     const esito = await promozioniService.carica(req.clienteId, id);
     if (!esito.ok) return res.status(404).json({ errore: esito.errore });
+    tgs.promoCaricata(req.clienteId, id);
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -144,6 +146,7 @@ async function aggiornaProfilo(req, res, next) {
       `UPDATE clienti SET nome = $1, cognome = $2, email = $3, data_nascita = $4 WHERE id = $5`,
       [nome, cognome || null, email || null, dataNascita || null, req.clienteId]
     );
+    tgs.clienteCreatoOAggiornato(req.clienteId);
     res.json({ ok: true });
   } catch (err) {
     next(err);

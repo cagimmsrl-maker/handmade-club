@@ -48,6 +48,9 @@ app.use(errorHandler);
 // Conservazione dati: anonimizza i clienti inattivi da 24 mesi (informativa).
 require('./services/pulizieService').avviaPulizieGiornaliere();
 
+// Cassa TGS: consegna in sottofondo degli eventi accodati (spento finché TGS_ENABLED != true).
+require('./services/tgs').avviaLavoratore();
+
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
   console.log(`Handmade Club backend in ascolto sulla porta ${PORT}`);

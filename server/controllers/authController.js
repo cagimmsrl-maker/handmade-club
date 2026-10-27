@@ -3,6 +3,7 @@ const otpService = require('../services/otpService');
 const jwtService = require('../services/jwtService');
 const promozioniService = require('../services/promozioniService');
 const { INFORMATIVA_VERSIONE } = require('../config/privacy');
+const tgs = require('../services/tgs');
 const { opzioniCookie } = require('../services/cookieOptions');
 
 function normalizzaTelefono(telefono) {
@@ -100,6 +101,7 @@ async function completaProfilo(req, res, next) {
     );
 
     await client.query('COMMIT');
+    tgs.clienteCreatoOAggiornato(cliente.id);
 
     const token = jwtService.creaTokenSessione('cliente', { clienteId: cliente.id });
     res.cookie(jwtService.NOME_COOKIE.cliente, token, opzioniCookie('cliente'));
@@ -151,6 +153,7 @@ async function registra(req, res, next) {
       [cliente.id, `HC-${String(cliente.id).padStart(6, '0')}`, promozioniService.generaCodiceQr()]
     );
     await client.query('COMMIT');
+    tgs.clienteCreatoOAggiornato(cliente.id);
 
     const token = jwtService.creaTokenSessione('cliente', { clienteId: cliente.id });
     res.cookie(jwtService.NOME_COOKIE.cliente, token, opzioniCookie('cliente'));
