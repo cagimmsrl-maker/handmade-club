@@ -168,8 +168,8 @@ camelCase); il codice la segue alla lettera, in `tgsController.js`, `tgs.schema.
   telefono, email|null, qrCode, registratoIl }] }` — clienti attivi con tessera attiva senza esito per
   la sede della chiave, dal più vecchio. Limiti TGS: id 64, nome/cognome 100, telefono 15 (solo cifre
   e `+`; **in uscita sempre internazionale `+39…`**, perché TGS riconosce i doppioni dal telefono),
-  email 100 (più lunga → null), QR 50. `cognome` è obbligatorio per TGS: se manca si manda `""`
-  (da verificare con TGS se lo accettano). Date ISO 8601 con fuso di Roma (`isoConFuso`).
+  email 100 (più lunga → null), QR 50. `cognome` è obbligatorio per TGS e, dal 27/10/2026, anche in app (registrazione e profilo); per
+  gli iscritti precedenti senza cognome si manda `""` e in caso di `errore` lo aggiungono dal profilo. Date ISO 8601 con fuso di Roma (`isoConFuso`).
 - `POST /api/tgs/clienti/{id}/esito` `{ esito: creato|gia_presente|errore, codiceClienteTgs,
   codiceCardTgs, barcodeCard, messaggio, elaboratoIl }` → **204** vuoto; 401 chiave; 404 cliente
   inesistente; **422** corpo non valido. **Idempotente**: upsert su `tgs_sincronizzazioni

@@ -67,7 +67,7 @@ async function clientiDaSincronizzare(req, res, next) {
       clienti: rows.map((r) => ({
         id: String(r.id),                               // stringa, stabile, ≤ 64
         nome: taglia(r.nome, 100),
-        cognome: taglia(r.cognome, 100) || '',          // obbligatorio per TGS: se manca, vuoto
+        cognome: taglia(r.cognome, 100) || '',          // obbligatorio (dal 27/10 anche in app); vuoto solo per iscritti prima
         telefono: telefonoTgs(r.telefono),
         email: r.email && String(r.email).trim().length <= 100 ? String(r.email).trim() : null,
         qrCode: taglia(r.codice_qr, 50),

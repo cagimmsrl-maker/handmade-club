@@ -30,7 +30,7 @@ export default function Onboarding({ onCompletato }) {
   function profiloPayload() {
     return {
       nome,
-      cognome: cognome || undefined,
+      cognome,
       email: email || undefined,
       dataNascita: dataNascita || undefined,
       consensoMarketing,
@@ -121,8 +121,8 @@ export default function Onboarding({ onCompletato }) {
         <input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} required autoComplete="given-name" />
       </div>
       <div className="campo">
-        <label htmlFor="cognome">Cognome</label>
-        <input id="cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} autoComplete="family-name" />
+        <label htmlFor="cognome">Cognome *</label>
+        <input id="cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} required autoComplete="family-name" />
       </div>
       <div className="campo">
         <label htmlFor="email">Email (facoltativa)</label>
@@ -153,7 +153,7 @@ export default function Onboarding({ onCompletato }) {
       {modo === MODO_REGISTRA && (
         <form className="card" onSubmit={registra}>
           <h2>Crea la tua tessera</h2>
-          <p className="testo-secondario">Bastano nome e numero di telefono. Nessun codice, nessuna password.</p>
+          <p className="testo-secondario">Bastano nome, cognome e numero di telefono. Nessun codice, nessuna password.</p>
           <div className="campo">
             <label htmlFor="telefono">Numero di telefono *</label>
             <input

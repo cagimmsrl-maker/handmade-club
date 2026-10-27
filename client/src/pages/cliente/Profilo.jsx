@@ -39,7 +39,7 @@ export default function Profilo({ onAccountCancellato }) {
     try {
       await api.put('/cliente/profilo', {
         nome,
-        cognome: cognome || undefined,
+        cognome,
         email: email || undefined,
         dataNascita: dataNascita || undefined,
       })
@@ -141,8 +141,8 @@ export default function Profilo({ onAccountCancellato }) {
           <input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
         </div>
         <div className="campo">
-          <label htmlFor="cognome">Cognome</label>
-          <input id="cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} />
+          <label htmlFor="cognome">Cognome *</label>
+          <input id="cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} required />
         </div>
         <div className="campo">
           <label htmlFor="email">Email</label>
