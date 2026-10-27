@@ -13,7 +13,7 @@ const COLONNE = `
   p.id, p.titolo, p.descrizione, p.tipo, p.valore, p.prodotto,
   p.valido_dal, p.valido_al, p.ora_inizio, p.ora_fine, p.giorni_settimana,
   p.target_livello_id, p.target_sede_id, p.usi_per_cliente,
-  p.stato, p.pubblicata_il, p.created_at, p.immagine, p.codice_tgs
+  p.stato, p.pubblicata_il, p.created_at, p.immagine, p.codice_tgs, p.automatica
 `;
 
 // Codice tessera statico, nel QR e nel codice a barre: EAN-13 con prefisso
@@ -170,14 +170,15 @@ function daBody(b) {
     b.targetLivelloId ?? null, b.targetSedeId ?? null,
     b.usiPerCliente === null ? null : (b.usiPerCliente ?? 1),
     b.codiceTgs || null,
+    !!b.automatica,
   ];
 }
 
 async function creaAdmin(body, adminId) {
   const { rows } = await pool.query(
     `INSERT INTO promozioni (titolo, descrizione, tipo, valore, prodotto, valido_dal, valido_al,
-       ora_inizio, ora_fine, giorni_settimana, target_livello_id, target_sede_id, usi_per_cliente, codice_tgs, creata_da)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       ora_inizio, ora_fine, giorni_settimana, target_livello_id, target_sede_id, usi_per_cliente, codice_tgs, automatica, creata_da)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
      RETURNING id`,
     [...daBody(body), adminId]
   );
@@ -188,10 +189,11 @@ async function aggiornaAdmin(id, body) {
   const { rowCount } = await pool.query(
     `UPDATE promozioni SET titolo=$1, descrizione=$2, tipo=$3, valore=$4, prodotto=$5,
        valido_dal=$6, valido_al=$7, ora_inizio=$8, ora_fine=$9, giorni_settimana=$10,
-       target_livello_id=$11, target_sede_id=$12, usi_per_cliente=$13, codice_tgs=$14, updated_at=now()
-     WHERE id=$15 AND stato <> 'archiviata'`,
+       target_livello_id=$11, target_sede_id=$12, usi_per_cliente=$13, codice_tgs=$14, automatica=$15, updated_at=now()
+     WHERE id=$16 AND stato <> 'archiviata'`,
     [...daBody(body), id]
   );
+  if (rowCount > 0 && body.automatica) await caricaAutomaticaPerTutti(id);
   return rowCount > 0;
 }
 
@@ -204,7 +206,39 @@ async function cambiaStato(id, stato) {
       WHERE id = $1`,
     [id, stato]
   );
+  if (rowCount > 0 && stato === 'pubblicata') await caricaAutomaticaPerTutti(id);
   return rowCount > 0;
+}
+
+// Promo "automatica": alla pubblicazione la carica per tutti i clienti attivi
+// con tessera attiva (del livello di destinazione, se indicato). Idempotente
+// (UNIQUE promozione+cliente). Le promo per sede restano per tutti: la sede
+// limita dove si USA, non chi la riceve.
+async function caricaAutomaticaPerTutti(promozioneId) {
+  const { rowCount } = await pool.query(
+    `INSERT INTO promozioni_clienti (promozione_id, cliente_id)
+     SELECT p.id, c.id
+       FROM promozioni p
+       JOIN clienti c ON c.stato = 'attivo'
+       JOIN tessere t ON t.cliente_id = c.id AND t.stato = 'attiva'
+      WHERE p.id = $1 AND p.automatica = true AND p.stato = 'pubblicata'
+        AND (p.target_livello_id IS NULL OR p.target_livello_id = c.livello_id)
+     ON CONFLICT (promozione_id, cliente_id) DO NOTHING`,
+    [promozioneId]
+  );
+  return rowCount;
+}
+
+// Nuovo cliente: riceve subito le promo automatiche pubblicate e non scadute.
+async function caricaAutomaticheNuovoCliente(clienteId) {
+  await pool.query(
+    `INSERT INTO promozioni_clienti (promozione_id, cliente_id)
+     SELECT p.id, $1 FROM promozioni p
+      WHERE p.automatica = true AND p.stato = 'pubblicata' AND p.valido_al >= CURRENT_DATE
+        AND (p.target_livello_id IS NULL OR p.target_livello_id = (SELECT livello_id FROM clienti WHERE id = $1))
+     ON CONFLICT (promozione_id, cliente_id) DO NOTHING`,
+    [clienteId]
+  );
 }
 
 async function eliminaAdmin(id) {
@@ -256,6 +290,7 @@ function serializza(r) {
     usiPerCliente: r.usi_per_cliente,
     immagine: immagini.urlImmaginePromozione(r.immagine),
     codiceTgs: r.codice_tgs ?? null,
+    automatica: !!r.automatica,
     stato: r.stato,
     pubblicataIl: r.pubblicata_il,
     caricataIl: r.caricata_il ?? null,
@@ -270,4 +305,5 @@ module.exports = {
   TIPI, generaCodiceQr, codiceCardValido, cifraControlloEan13, PREFISSO_CARD, validaOra,
   bachecaPerCliente, carica, caricateUtilizzabili, segnaUsata,
   listaAdmin, creaAdmin, aggiornaAdmin, cambiaStato, eliminaAdmin, impostaImmagine,
+  caricaAutomaticaPerTutti, caricaAutomaticheNuovoCliente,
 };

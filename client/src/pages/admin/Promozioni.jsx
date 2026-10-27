@@ -23,7 +23,7 @@ function oggi() {
 const VUOTO = {
   titolo: '', descrizione: '', tipo: 'sconto_percentuale', valore: '', prodotto: '',
   validoDal: oggi(), validoAl: oggi(), oraInizio: '', oraFine: '',
-  giorniSettimana: [], targetLivelloId: '', targetSedeId: '', usiPerCliente: 1, usiIllimitati: false, codiceTgs: '',
+  giorniSettimana: [], targetLivelloId: '', targetSedeId: '', usiPerCliente: 1, usiIllimitati: false, codiceTgs: '', automatica: false,
 }
 
 export default function Promozioni() {
@@ -90,7 +90,7 @@ export default function Promozioni() {
       oraInizio: p.oraInizio ?? '', oraFine: p.oraFine ?? '',
       giorniSettimana: p.giorniSettimana ?? [],
       targetLivelloId: p.targetLivelloId ?? '', targetSedeId: p.targetSedeId ?? '',
-      usiPerCliente: p.usiPerCliente ?? 1, usiIllimitati: p.usiPerCliente == null, codiceTgs: p.codiceTgs ?? '',
+      usiPerCliente: p.usiPerCliente ?? 1, usiIllimitati: p.usiPerCliente == null, codiceTgs: p.codiceTgs ?? '', automatica: !!p.automatica,
     })
     setEditId(p.id); setErrore(''); setOk(''); azzeraFoto(p.immagine ?? null)
   }
@@ -111,6 +111,7 @@ export default function Promozioni() {
       targetSedeId: form.targetSedeId ? Number(form.targetSedeId) : null,
       usiPerCliente: form.usiIllimitati ? null : Number(form.usiPerCliente || 1),
       codiceTgs: form.codiceTgs.trim() || null,
+      automatica: !!form.automatica,
     }
   }
 
@@ -184,7 +185,7 @@ export default function Promozioni() {
             {lista.map((p) => (
               <tr key={p.id} style={{ opacity: p.stato === 'archiviata' ? 0.55 : 1 }}>
                 <td>{p.immagine && <img className="miniatura-foto" src={p.immagine} alt="" />}<strong>{p.titolo}</strong></td>
-                <td>{etichettaTipo(p) ?? 'Messaggio'}{p.codiceTgs ? <span className="testo-secondario"> · cassa {p.codiceTgs}</span> : ''}</td>
+                <td>{etichettaTipo(p) ?? 'Messaggio'}{p.automatica ? <span className="testo-secondario"> · automatica</span> : ''}{p.codiceTgs ? <span className="testo-secondario"> · cassa {p.codiceTgs}</span> : ''}</td>
                 <td>{etichettaValidita(p)}</td>
                 <td>{[p.livelloNome && `livello ${p.livelloNome}`, p.sedeNome].filter(Boolean).join(', ') || 'tutti'}</td>
                 <td>{STATO[p.stato]}</td>
@@ -317,6 +318,16 @@ export default function Promozioni() {
               </div>
             </div>
           )}
+
+          <div className="campo-checkbox" style={{ marginTop: 6 }}>
+            <input id="automatica" type="checkbox" checked={form.automatica} onChange={(e) => setForm({ ...form, automatica: e.target.checked })} />
+            <label htmlFor="automatica">
+              <strong>Caricata automaticamente su tutte le tessere</strong>
+              <span className="testo-secondario" style={{ display: 'block', fontSize: '0.85rem' }}>
+                Per le promo di benvenuto: ce l'hanno già tutti gli iscritti e chi si iscrive da ora, senza doverla caricare.
+              </span>
+            </label>
+          </div>
 
           {form.tipo !== 'messaggio' && (
             <div className="campo">

@@ -145,7 +145,11 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   pubblicata; il resto si archivia per non perdere caricamenti e utilizzi.
 - Il cliente vede in bacheca (`/promozioni`) le promo pubblicate non scadute destinate a lui e le
   **carica** (`promozioni_clienti`). Una promo non caricata per quel cliente NON vale: è il punto
-  della funzione (creare interazione), non un limite da aggirare.
+  della funzione (creare interazione), non un limite da aggirare. Eccezione voluta (migrazione 013):
+  `promozioni.automatica = true` (casella "Caricata automaticamente su tutte le tessere" in admin) per
+  le promo di benvenuto: alla pubblicazione viene caricata per tutti i clienti attivi con tessera
+  (`caricaAutomaticaPerTutti`) e a ogni registrazione per il nuovo cliente
+  (`caricaAutomaticheNuovoCliente`, senza richiedere la verifica del numero).
 - Alla scansione l'operatore riceve solo le promo caricate, valide in quell'istante e in quella sede,
   con usi residui (`promozioniService.caricateUtilizzabili`); applica lo sconto in cassa e preme
   "Applicata" (`POST /operatore/promozioni/:id/usa`), che scrive `promozioni_utilizzi`. Il server

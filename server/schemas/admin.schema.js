@@ -52,6 +52,7 @@ const promozioneSchema = z
     targetSedeId: z.number().int().positive().optional().nullable(),
     usiPerCliente: z.number().int().positive().optional().nullable(),
     codiceTgs: z.string().trim().max(50).optional().nullable().or(z.literal('')),
+    automatica: z.boolean().optional().default(false),
   })
   .refine((d) => d.validoAl >= d.validoDal, { message: 'La fine deve essere dopo l\'inizio', path: ['validoAl'] })
   .refine((d) => !!d.oraInizio === !!d.oraFine, { message: 'Indica sia ora di inizio sia di fine', path: ['oraFine'] })
