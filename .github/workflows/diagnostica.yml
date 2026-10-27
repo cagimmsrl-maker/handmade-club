@@ -1,45 +1,14 @@
-name: Diagnostica rete (solo lettura)
+name: Comando sul server (solo lettura salvo indicazione)
 
-# Lanciata a mano: verifica se un host risponde, prima da Internet (runner
-# GitHub) e poi dal nostro server. Non modifica nulla sul server.
 on:
   push:
     branches: [diagnostica-rete]
 
-env:
-  HOST: '5.154.199.20'
-  PORTE: '9443 8443'
-
 jobs:
-  diagnostica:
+  comando:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     steps:
-      - name: Da Internet (runner GitHub)
-        run: |
-          for p in $PORTE; do
-            if timeout 5 bash -c "</dev/tcp/$HOST/$p" 2>/dev/null; then echo "runner -> porta $p: APERTA"; else echo "runner -> porta $p: chiusa/filtrata"; fi
-          done
-          echo "--- chi risponde su 8443 (HTTPS)"
-          curl -skv -m 8 -o /dev/null "https://$HOST:9443/" 2>&1 | grep -iE "subject:|issuer:|^< server|^< HTTP|^< location|^< www-authenticate|realm" || true
-          echo "--- corpo (prime righe)"
-          curl -sk -m 8 "https://$HOST:9443/" 2>/dev/null | tr -d '\r' | grep -ioE "<title>[^<]*</title>|realm=\"[^\"]*\"|tgs|mikrotik|fritz|zyxel|tp-link|huawei|cisco|draytek|ubiquiti|teltonika|iis|apache|nginx" | sort -u | head -10 || true
-
-      - name: Chi risponde su 8089
-        run: |
-          for proto in http https; do
-            echo "=== $proto://$HOST:8089/"
-            curl -skv -m 8 "$proto://$HOST:8089/" -o /tmp/corpo_$proto 2>&1 | grep -iE "subject:|issuer:|^< HTTP|^< server|^< location|^< www-authenticate|^< content-type" || true
-            echo "--- corpo (estratto)"; head -c 600 /tmp/corpo_$proto | tr -d '\r' | tr -s ' \n' | head -c 600; echo
-          done
-          sudo apt-get install -y -qq nmap >/dev/null 2>&1
-          sudo nmap -Pn -sV -p 8089,4711 $HOST | grep -E "^[0-9]+/tcp|Service Info"
-
-      - name: Scansione completa porte (nmap, da Internet)
-        run: |
-          sudo apt-get install -y -qq nmap >/dev/null 2>&1
-          sudo nmap -Pn -T4 --min-rate 1500 --max-retries 1 -p 1-10000 --open -sS $HOST | grep -E "^[0-9]+/tcp|Nmap done"
-
       - name: Prepara chiave SSH
         run: |
           mkdir -p ~/.ssh
@@ -48,8 +17,8 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Dal nostro server
+      - name: Sedi attive e stato chiavi TGS (sola lettura)
         run: |
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            "H=$HOST; for p in $PORTE; do if timeout 5 bash -c \"</dev/tcp/\$H/\$p\" 2>/dev/null; then echo \"server -> porta \$p: APERTA\"; else echo \"server -> porta \$p: chiusa/filtrata\"; fi; done; ping -c 2 -W 2 \$H 2>&1 | tail -2"
+            'sudo -u postgres psql -d handmade_clienti -Atc "select id, nome, attiva from sedi order by id"; echo "--- chiavi TGS ---"; sudo -u postgres psql -d handmade_clienti -Atc "select k.id, s.nome, k.etichetta, k.attiva, k.ultimo_uso_il from tgs_chiavi_api k join sedi s on s.id=k.sede_id order by k.id"; echo "--- clienti attivi ---"; sudo -u postgres psql -d handmade_clienti -Atc "select count(*) from clienti where stato=$$attivo$$"'
