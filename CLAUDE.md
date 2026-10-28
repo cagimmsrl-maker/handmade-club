@@ -121,6 +121,14 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   guida in 3 passi (iPhone), POI manda alla registrazione. L'ordine conta su iPhone: l'app aggiunta
   alla Home non condivide i cookie con Safari, quindi il cliente deve creare la tessera dentro l'app
   installata, altrimenti si ritrova a fare il login con codice SMS.
+- **Samsung Internet → Chrome (28/10/2026).** Su Android 14/15 il pacchetto che Samsung Internet crea con
+  "Aggiungi alla Home" viene bloccato da Play Protect ("sviluppata per una versione precedente di Android"):
+  difetto del browser, uguale per tutti i siti. Perciò `meglioInChrome()` (Samsung Internet, Firefox, webview
+  Instagram/Facebook/WhatsApp) fa continuare in Chrome con un link `intent://…;package=com.android.chrome`
+  (`urlApriInChrome`; se Chrome manca → Play Store). Su `/installa` il salto si prova da solo
+  (`provaSaltoAChrome`, alcuni browser lo bloccano senza tocco) e poi compare "Continua con Chrome"; nel
+  banner dentro l'app solo il pulsante. Chrome e iPhone invariati. Non è una versione di Android a decidere,
+  è il browser.
 - Tessera in Apple/Google Wallet: in agenda (serve l'account sviluppatore Apple).
 
 ## Logica di dominio — Livelli e convenzioni

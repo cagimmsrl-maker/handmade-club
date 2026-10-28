@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   osservaInstallazione, mostraPromptInstallazione, giaInstallata, isIos, isSafari, isAndroid,
+  meglioInChrome, urlApriInChrome, provaSaltoAChrome,
 } from '../../lib/installa.js'
 
 // Pagina di atterraggio del QR al banco: prima di tutto mette l'app sulla
@@ -14,9 +15,17 @@ export default function Installa() {
   const [prompt, setPrompt] = useState(null)
   const [esito, setEsito] = useState(null) // 'installata' | 'rifiutata'
   const [attesa, setAttesa] = useState(true)
+  const chrome = meglioInChrome() // Samsung Internet, Firefox, webview: si continua in Chrome
 
   useEffect(() => {
     if (giaInstallata()) { navigate('/', { replace: true }); return }
+    if (chrome) {
+      // Tentativo senza tocco; se il browser lo blocca, dopo un attimo
+      // compare il pulsante "Continua con Chrome".
+      provaSaltoAChrome()
+      const t = setTimeout(() => setAttesa(false), 1200)
+      return () => clearTimeout(t)
+    }
     const stop = osservaInstallazione((p, installata) => {
       if (installata) setEsito('installata')
       else setPrompt(p)
@@ -26,7 +35,7 @@ export default function Installa() {
     // tempo si mostra la guida manuale.
     const t = setTimeout(() => setAttesa(false), 2500)
     return () => { stop(); clearTimeout(t) }
-  }, [navigate])
+  }, [navigate, chrome])
 
   async function installa() {
     const esito = await mostraPromptInstallazione()
@@ -46,6 +55,19 @@ export default function Installa() {
           Trova l'icona <strong>Handmade Club</strong> nella schermata Home e aprila da lì: crei la tessera in 10 secondi.
         </p>
         <button className="btn btn-secondario" onClick={() => navigate('/')}>Oppure continua qui</button>
+      </>
+    )
+  } else if (chrome) {
+    contenuto = (
+      <>
+        <h1>Metti la tessera sulla Home</h1>
+        <p className="installa-testo">
+          {attesa ? 'Un momento, apro Chrome…' : 'Per installare Handmade Club con un tocco, continua in Chrome: si apre da solo su questa pagina.'}
+        </p>
+        {!attesa && (
+          <a className="btn btn-primario installa-grande" href={urlApriInChrome()}>Continua con Chrome</a>
+        )}
+        <button className="link-testo" onClick={() => navigate('/')}>Continua qui senza installare</button>
       </>
     )
   } else if (prompt) {

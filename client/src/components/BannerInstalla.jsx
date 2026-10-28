@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { osservaInstallazione, mostraPromptInstallazione, giaInstallata, isIos, isSafari } from '../lib/installa.js'
+import { osservaInstallazione, mostraPromptInstallazione, giaInstallata, isIos, isSafari, meglioInChrome, urlApriInChrome } from '../lib/installa.js'
 
 // Invito a mettere l'app sulla schermata Home. Nessun sito può installarsi
 // da solo: su Android/Chrome il browser ci dà l'evento beforeinstallprompt
@@ -21,10 +21,17 @@ function chiusoDiRecente() {
 export default function BannerInstalla() {
   const [haPrompt, setHaPrompt] = useState(false)
   const [visibile, setVisibile] = useState(false)
-  const [modo, setModo] = useState(null) // 'android' | 'ios' | 'ios-altro-browser'
+  const [modo, setModo] = useState(null) // 'android' | 'chrome' | 'ios' | 'ios-altro-browser'
 
   useEffect(() => {
     if (giaInstallata() || chiusoDiRecente()) return
+    if (meglioInChrome()) {
+      // Samsung Internet & co.: l'installazione da qui non funziona bene,
+      // si propone di continuare in Chrome (nessun salto automatico dentro
+      // l'app, solo su /installa).
+      setModo('chrome'); setVisibile(true)
+      return
+    }
     const stop = osservaInstallazione((p, installata) => {
       if (installata) { setVisibile(false); return }
       setHaPrompt(true); setModo('android'); setVisibile(true)
@@ -59,6 +66,9 @@ export default function BannerInstalla() {
           {modo === 'android' && (
             <p>Si apre come un'app, senza cercarla nel browser.</p>
           )}
+          {modo === 'chrome' && (
+            <p>Continua in Chrome: si apre da solo e la installi con un tocco.</p>
+          )}
           {modo === 'ios' && (
             <p>
               Tocca <span className="ios-icona" aria-label="Condividi">⎙</span> <strong>Condividi</strong> in basso, poi{' '}
@@ -74,7 +84,10 @@ export default function BannerInstalla() {
         {modo === 'android' && (
           <button className="btn btn-primario" onClick={installa}>Installa</button>
         )}
-        <button className="btn btn-secondario" onClick={chiudi}>{modo === 'android' ? 'Più tardi' : 'Ho capito'}</button>
+        {modo === 'chrome' && (
+          <a className="btn btn-primario" href={urlApriInChrome('/installa')}>Continua con Chrome</a>
+        )}
+        <button className="btn btn-secondario" onClick={chiudi}>{modo === 'android' || modo === 'chrome' ? 'Più tardi' : 'Ho capito'}</button>
       </div>
     </div>
   )
