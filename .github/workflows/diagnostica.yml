@@ -21,8 +21,8 @@ jobs:
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
-          cat > /tmp/skebby-stato.js <<'JS'
-          require('dotenv').config({ path: '/var/www/handmade-club/server/.env' });
+          cat > /var/www/handmade-club/server/_skebby-stato.js <<'JS'
+          // env caricato con --env-file
           const BASE = 'https://api.skebby.it/API/v1.0/REST';
           const m = (n) => String(n || '').replace(/^(\+?\d{2,4})\d+(\d{3})$/, '$1…$2');
           (async () => {
@@ -43,7 +43,7 @@ jobs:
             }
           })().catch(e => console.log('errore:', e.message));
           JS
-          cd /var/www/handmade-club/server && node /tmp/skebby-stato.js; rm -f /tmp/skebby-stato.js
+          cd /var/www/handmade-club/server && node --env-file=.env _skebby-stato.js; rm -f _skebby-stato.js
           exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
