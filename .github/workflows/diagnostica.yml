@@ -17,24 +17,33 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Togli il mittente alfanumerico Skebby (2) e riavvia
+      - name: Stato consegna SMS Skebby da oggi (sola lettura)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
           cd /var/www/handmade-club/server || exit 1
-          ls .env.bak-* | tail -1
-          python3 - <<'PY'
-          import re, datetime
-          s = open('.env').read()
-          nota = "# SKEBBY_SENDER disattivato il %s: alias 'HandmadeCl' non registrato, molti operatori scartavano gli SMS (TIMEOUT su Skebby). Riattivare solo dopo l'approvazione dell'alias su Skebby.\n" % datetime.date.today().strftime('%d/%m/%Y')
-          s2, n = re.subn(r'^SKEBBY_SENDER=.*$', nota + 'SKEBBY_SENDER=', s, flags=re.M)
-          open('.env', 'w').write(s2)
-          print('righe sostituite:', n)
-          PY
-          grep -n 'SKEBBY_SENDER' .env
-          pm2 restart handmade-club --update-env >/dev/null && sleep 3 && pm2 describe handmade-club | grep -E "status" | head -1
-          node --env-file=.env -e "console.log('sender visto dal processo:', JSON.stringify(process.env.SKEBBY_SENDER || ''))"
-          pm2 logs handmade-club --lines 3 --nostream 2>/dev/null | tail -2
+          cat > _skebby-stato.js <<'JS'
+          const BASE = 'https://api.skebby.it/API/v1.0/REST';
+          const m = (n) => String(n || '').replace(/^(\+?\d{2,4})\d+(\d{3})$/, '$1…$2');
+          (async () => {
+            const r = await fetch(`${BASE}/login?username=${encodeURIComponent(process.env.SKEBBY_USER)}&password=${encodeURIComponent(process.env.SKEBBY_PASSWORD)}`);
+            const [user_key, Session_key] = (await r.text()).trim().split(';');
+            const h = { user_key, Session_key };
+            const hist = await (await fetch(`${BASE}/smshistory?from=20261030000000&pageSize=100`, { headers: h })).json().catch(() => ({}));
+            const lista = hist.smshistory || [];
+            console.log('SMS inviati oggi:', lista.length);
+            for (const o of lista) {
+              const d = await (await fetch(`${BASE}/sms/${o.order_id}`, { headers: h })).json().catch(() => ({}));
+              const rec = (d.recipients || []).map(x => `${m(x.destination)} ${x.status}${x.delivery_date ? ' ' + x.delivery_date : ''}`).join('; ');
+              console.log(`${o.schedule_time || o.send_date || o.order_id} mittente=${o.sender || '(numero)'} → ${rec}`);
+            }
+          })().catch(e => console.log('errore:', e.message));
+          JS
+          node --env-file=.env _skebby-stato.js; rm -f _skebby-stato.js
+          echo "--- OTP oggi (ora, tentativi, usato) ---"
+          sudo -u postgres psql -d handmade_clienti -Atc "select to_char(created_at at time zone 'Europe/Rome','HH24:MI'), tentativi, usato from otp_codes where created_at >= '2026-10-30 00:00+01' order by id"
+          echo "--- verificati oggi ---"
+          sudo -u postgres psql -d handmade_clienti -Atc "select count(*) from clienti where telefono_verificato and (updated_at at time zone 'Europe/Rome')::date = current_date" 2>&1
           exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
