@@ -17,18 +17,33 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Stato SMS (sola lettura)
+      - name: Stato consegna SMS su Skebby (sola lettura)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
-          Q() { sudo -u postgres psql -d handmade_clienti -Atc "$1"; }
-          echo "--- file di log pm2 ---"; ls -la ~/.pm2/logs/ | grep handmade
-          echo "--- ultime 20 righe SMS (pm2 logs con ora) ---"
-          pm2 logs handmade-club --lines 3000 --nostream --timestamp "YYYY-MM-DD HH:mm" 2>/dev/null | grep "\[SMS" | tail -20
-          echo "--- OTP per giorno: richiesti / usati / con tentativi ---"
-          Q "select (created_at at time zone 'Europe/Rome')::date g, count(*) richiesti, count(*) filter (where usato) usati, count(*) filter (where tentativi>0) con_tentativi from otp_codes where created_at >= '2026-10-27 00:00+01' group by 1 order by 1"
-          echo "--- ultimi 12 OTP (ora, tentativi, usato) ---"
-          Q "select to_char(created_at at time zone 'Europe/Rome','DD/MM HH24:MI'), tentativi, usato from otp_codes order by id desc limit 12"
+          cat > /tmp/skebby-stato.js <<'JS'
+          require('dotenv').config({ path: '/var/www/handmade-club/server/.env' });
+          const BASE = 'https://api.skebby.it/API/v1.0/REST';
+          const m = (n) => String(n || '').replace(/^(\+?\d{2,4})\d+(\d{3})$/, '$1…$2');
+          (async () => {
+            console.log('config: message_type=' + (process.env.SKEBBY_MESSAGE_TYPE || 'GP (default)') + ' sender=' + (process.env.SKEBBY_SENDER || '(nessuno: numero Skebby)'));
+            const r = await fetch(`${BASE}/login?username=${encodeURIComponent(process.env.SKEBBY_USER)}&password=${encodeURIComponent(process.env.SKEBBY_PASSWORD)}`);
+            if (!r.ok) { console.log('login HTTP ' + r.status); return; }
+            const [user_key, Session_key] = (await r.text()).trim().split(';');
+            const h = { user_key, Session_key };
+            const st = await (await fetch(`${BASE}/status?getMoney=true&typeAliases=true`, { headers: h })).json().catch(() => ({}));
+            console.log('credito:', JSON.stringify({ money: st.money, sms: st.sms }));
+            const hist = await (await fetch(`${BASE}/smshistory?from=20261027000000&pageSize=100`, { headers: h })).json().catch(() => ({}));
+            const lista = hist.smshistory || [];
+            console.log('SMS inviati dal 27/10:', lista.length);
+            for (const o of lista) {
+              const d = await (await fetch(`${BASE}/sms/${o.order_id}`, { headers: h })).json().catch(() => ({}));
+              const rec = (d.recipients || []).map(x => `${m(x.destination)} ${x.status}${x.delivery_date ? ' ' + x.delivery_date : ''}`).join('; ');
+              console.log(`${o.schedule_time || o.send_date || ''} tipo=${o.message_type} mittente=${o.sender || '-'} → ${rec || JSON.stringify(d).slice(0, 120)}`);
+            }
+          })().catch(e => console.log('errore:', e.message));
+          JS
+          cd /var/www/handmade-club/server && node /tmp/skebby-stato.js; rm -f /tmp/skebby-stato.js
           exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
