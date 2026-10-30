@@ -17,42 +17,24 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Togli il mittente alfanumerico Skebby, riavvia, prova di consegna
+      - name: Togli il mittente alfanumerico Skebby (2) e riavvia
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
           cd /var/www/handmade-club/server || exit 1
-          cp -a .env ".env.bak-$(date +%Y%m%d-%H%M%S)" && echo "backup .env fatto"
-          if grep -q '^SKEBBY_SENDER=' .env; then
-            sed -i "s/^SKEBBY_SENDER=.*/# SKEBBY_SENDER disattivato il $(date +%d\/%m\/%Y): alias 'HandmadeCl' non registrato, gli operatori scartavano gli SMS (TIMEOUT). Riattivare solo dopo approvazione alias su Skebby.\nSKEBBY_SENDER=/" .env
-            echo "SKEBBY_SENDER svuotato"
-          else echo "SKEBBY_SENDER non presente"; fi
+          ls .env.bak-* | tail -1
+          python3 - <<'PY'
+          import re, datetime
+          s = open('.env').read()
+          nota = "# SKEBBY_SENDER disattivato il %s: alias 'HandmadeCl' non registrato, molti operatori scartavano gli SMS (TIMEOUT su Skebby). Riattivare solo dopo l'approvazione dell'alias su Skebby.\n" % datetime.date.today().strftime('%d/%m/%Y')
+          s2, n = re.subn(r'^SKEBBY_SENDER=.*$', nota + 'SKEBBY_SENDER=', s, flags=re.M)
+          open('.env', 'w').write(s2)
+          print('righe sostituite:', n)
+          PY
           grep -n 'SKEBBY_SENDER' .env
-          pm2 restart handmade-club --update-env >/dev/null && sleep 3 && pm2 describe handmade-club | grep -E "status|uptime" | head -2
-          cat > _skebby-prova.js <<'JS'
-          const BASE = 'https://api.skebby.it/API/v1.0/REST';
-          const m = (n) => String(n || '').replace(/^(\+?\d{2,4})\d+(\d{3})$/, '$1…$2');
-          const dormi = (ms) => new Promise(r => setTimeout(r, ms));
-          (async () => {
-            console.log('sender ora: ' + (process.env.SKEBBY_SENDER ? process.env.SKEBBY_SENDER : '(vuoto → numero Skebby)'));
-            const r = await fetch(`${BASE}/login?username=${encodeURIComponent(process.env.SKEBBY_USER)}&password=${encodeURIComponent(process.env.SKEBBY_PASSWORD)}`);
-            const [user_key, Session_key] = (await r.text()).trim().split(';');
-            const h = { user_key, Session_key, 'Content-Type': 'application/json' };
-            const corpo = { message_type: process.env.SKEBBY_MESSAGE_TYPE || 'GP', message: 'Handmade Club: SMS di prova dopo la correzione del mittente. Se lo leggi, i codici di verifica ora arrivano.', recipient: ['+393356483122'], returnCredits: false };
-            if (process.env.SKEBBY_SENDER) corpo.sender = process.env.SKEBBY_SENDER;
-            const inv = await (await fetch(`${BASE}/sms`, { method: 'POST', headers: h, body: JSON.stringify(corpo) })).json().catch(() => ({}));
-            console.log('invio:', inv.result, 'order', inv.order_id ? 'ok' : '-');
-            for (let i = 0; i < 6 && inv.order_id; i++) {
-              await dormi(10000);
-              const d = await (await fetch(`${BASE}/sms/${inv.order_id}`, { headers: { user_key, Session_key } })).json().catch(() => ({}));
-              const st = (d.recipients || []).map(x => `${m(x.destination)} ${x.status}${x.delivery_date ? ' ' + x.delivery_date : ''}`).join('; ');
-              console.log(`dopo ${(i + 1) * 10}s:`, st);
-              if (/DLVRD|TIMEOUT|ERROR|UNKNOWN/.test(st)) break;
-            }
-          })().catch(e => console.log('errore:', e.message));
-          JS
-          node --env-file=.env _skebby-prova.js; rm -f _skebby-prova.js
-          echo "--- log app dopo riavvio ---"; pm2 logs handmade-club --lines 5 --nostream 2>/dev/null | tail -5
+          pm2 restart handmade-club --update-env >/dev/null && sleep 3 && pm2 describe handmade-club | grep -E "status" | head -1
+          node --env-file=.env -e "console.log('sender visto dal processo:', JSON.stringify(process.env.SKEBBY_SENDER || ''))"
+          pm2 logs handmade-club --lines 3 --nostream 2>/dev/null | tail -2
           exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
