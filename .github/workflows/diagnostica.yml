@@ -22,19 +22,13 @@ jobs:
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
           Q() { sudo -u postgres psql -d handmade_clienti -Atc "$1"; }
-          L=/root/.pm2/logs
-          echo "--- ultime 15 righe SMS nel log out (con riga precedente per l'ora) ---"
-          grep -n "\[SMS" $L/handmade-club-out.log | tail -15
-          echo "--- ultime 5 righe SMS nel log error ---"
-          grep -n "\[SMS" $L/handmade-club-error.log | tail -5
-          echo "--- righe totali log out / data ultima riga ---"
-          wc -l < $L/handmade-club-out.log; tail -1 $L/handmade-club-out.log | cut -c1-120
-          echo "--- OTP (otp_codes) per giorno dal 27/10 ---"
-          Q "select column_name from information_schema.columns where table_name='otp_codes' order by ordinal_position" | tr '\n' ' '; echo
-          Q "select (created_at at time zone 'Europe/Rome')::date g, count(*) from otp_codes where created_at >= '2026-10-27 00:00+01' group by 1 order by 1"
-          echo "--- ultimi 10 OTP (senza codice né numero) ---"
-          Q "select id, (created_at at time zone 'Europe/Rome')::timestamp(0), cliente_id, tentativi, usato_il is not null as usato from otp_codes order by id desc limit 10" 2>&1 | head -12
-          echo "--- provider ---"; grep -ho '^SMS_PROVIDER=.*' /root/handmade-club/server/.env /var/www/handmade-club/server/.env 2>/dev/null; pm2 describe handmade-club 2>/dev/null | grep -E "script path|exec cwd" 
+          echo "--- file di log pm2 ---"; ls -la ~/.pm2/logs/ | grep handmade
+          echo "--- ultime 20 righe SMS (pm2 logs con ora) ---"
+          pm2 logs handmade-club --lines 3000 --nostream --timestamp "YYYY-MM-DD HH:mm" 2>/dev/null | grep "\[SMS" | tail -20
+          echo "--- OTP per giorno: richiesti / usati / con tentativi ---"
+          Q "select (created_at at time zone 'Europe/Rome')::date g, count(*) richiesti, count(*) filter (where usato) usati, count(*) filter (where tentativi>0) con_tentativi from otp_codes where created_at >= '2026-10-27 00:00+01' group by 1 order by 1"
+          echo "--- ultimi 12 OTP (ora, tentativi, usato) ---"
+          Q "select to_char(created_at at time zone 'Europe/Rome','DD/MM HH24:MI'), tentativi, usato from otp_codes order by id desc limit 12"
           exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
