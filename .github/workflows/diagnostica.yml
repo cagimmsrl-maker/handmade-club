@@ -17,33 +17,42 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Stato consegna SMS su Skebby (sola lettura)
+      - name: Togli il mittente alfanumerico Skebby, riavvia, prova di consegna
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
-          cat > /var/www/handmade-club/server/_skebby-stato.js <<'JS'
-          // env caricato con --env-file
+          cd /var/www/handmade-club/server || exit 1
+          cp -a .env ".env.bak-$(date +%Y%m%d-%H%M%S)" && echo "backup .env fatto"
+          if grep -q '^SKEBBY_SENDER=' .env; then
+            sed -i "s/^SKEBBY_SENDER=.*/# SKEBBY_SENDER disattivato il $(date +%d\/%m\/%Y): alias 'HandmadeCl' non registrato, gli operatori scartavano gli SMS (TIMEOUT). Riattivare solo dopo approvazione alias su Skebby.\nSKEBBY_SENDER=/" .env
+            echo "SKEBBY_SENDER svuotato"
+          else echo "SKEBBY_SENDER non presente"; fi
+          grep -n 'SKEBBY_SENDER' .env
+          pm2 restart handmade-club --update-env >/dev/null && sleep 3 && pm2 describe handmade-club | grep -E "status|uptime" | head -2
+          cat > _skebby-prova.js <<'JS'
           const BASE = 'https://api.skebby.it/API/v1.0/REST';
           const m = (n) => String(n || '').replace(/^(\+?\d{2,4})\d+(\d{3})$/, '$1…$2');
+          const dormi = (ms) => new Promise(r => setTimeout(r, ms));
           (async () => {
-            console.log('config: message_type=' + (process.env.SKEBBY_MESSAGE_TYPE || 'GP (default)') + ' sender=' + (process.env.SKEBBY_SENDER || '(nessuno: numero Skebby)'));
+            console.log('sender ora: ' + (process.env.SKEBBY_SENDER ? process.env.SKEBBY_SENDER : '(vuoto → numero Skebby)'));
             const r = await fetch(`${BASE}/login?username=${encodeURIComponent(process.env.SKEBBY_USER)}&password=${encodeURIComponent(process.env.SKEBBY_PASSWORD)}`);
-            if (!r.ok) { console.log('login HTTP ' + r.status); return; }
             const [user_key, Session_key] = (await r.text()).trim().split(';');
-            const h = { user_key, Session_key };
-            const st = await (await fetch(`${BASE}/status?getMoney=true&typeAliases=true`, { headers: h })).json().catch(() => ({}));
-            console.log('credito:', JSON.stringify({ money: st.money, sms: st.sms }));
-            const hist = await (await fetch(`${BASE}/smshistory?from=20261027000000&pageSize=100`, { headers: h })).json().catch(() => ({}));
-            const lista = hist.smshistory || [];
-            console.log('SMS inviati dal 27/10:', lista.length);
-            for (const o of lista) {
-              const d = await (await fetch(`${BASE}/sms/${o.order_id}`, { headers: h })).json().catch(() => ({}));
-              const rec = (d.recipients || []).map(x => `${m(x.destination)} ${x.status}${x.delivery_date ? ' ' + x.delivery_date : ''}`).join('; ');
-              console.log(`${o.schedule_time || o.send_date || ''} tipo=${o.message_type} mittente=${o.sender || '-'} → ${rec || JSON.stringify(d).slice(0, 120)}`);
+            const h = { user_key, Session_key, 'Content-Type': 'application/json' };
+            const corpo = { message_type: process.env.SKEBBY_MESSAGE_TYPE || 'GP', message: 'Handmade Club: SMS di prova dopo la correzione del mittente. Se lo leggi, i codici di verifica ora arrivano.', recipient: ['+393356483122'], returnCredits: false };
+            if (process.env.SKEBBY_SENDER) corpo.sender = process.env.SKEBBY_SENDER;
+            const inv = await (await fetch(`${BASE}/sms`, { method: 'POST', headers: h, body: JSON.stringify(corpo) })).json().catch(() => ({}));
+            console.log('invio:', inv.result, 'order', inv.order_id ? 'ok' : '-');
+            for (let i = 0; i < 6 && inv.order_id; i++) {
+              await dormi(10000);
+              const d = await (await fetch(`${BASE}/sms/${inv.order_id}`, { headers: { user_key, Session_key } })).json().catch(() => ({}));
+              const st = (d.recipients || []).map(x => `${m(x.destination)} ${x.status}${x.delivery_date ? ' ' + x.delivery_date : ''}`).join('; ');
+              console.log(`dopo ${(i + 1) * 10}s:`, st);
+              if (/DLVRD|TIMEOUT|ERROR|UNKNOWN/.test(st)) break;
             }
           })().catch(e => console.log('errore:', e.message));
           JS
-          cd /var/www/handmade-club/server && node --env-file=.env _skebby-stato.js; rm -f _skebby-stato.js
+          node --env-file=.env _skebby-prova.js; rm -f _skebby-prova.js
+          echo "--- log app dopo riavvio ---"; pm2 logs handmade-club --lines 5 --nostream 2>/dev/null | tail -5
           exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
