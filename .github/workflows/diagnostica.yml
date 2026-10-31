@@ -17,27 +17,15 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Link di accesso al pannello Skebby via SMS al titolare
+      - name: Prova porte pubbliche Fiano dal VPS (sola lettura)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
-          cd /var/www/handmade-club/server || exit 1
-          cat > _skebby-dash.js <<'JS'
-          const BASE = 'https://api.skebby.it/API/v1.0/REST';
-          (async () => {
-            const r = await fetch(`${BASE}/login?username=${encodeURIComponent(process.env.SKEBBY_USER)}&password=${encodeURIComponent(process.env.SKEBBY_PASSWORD)}`);
-            const [user_key, Session_key] = (await r.text()).trim().split(';');
-            const h = { user_key, Session_key, 'Content-Type': 'application/json' };
-            const d = await fetch(`${BASE}/dashboard`, { headers: h });
-            const testo = (await d.text()).trim();
-            console.log('dashboard HTTP', d.status, 'lunghezza risposta', testo.length, 'inizia con https:', testo.startsWith('https'));
-            if (!d.ok || !testo.startsWith('http')) { console.log('risposta (primi 80 car.):', testo.slice(0, 80)); return; }
-            const corpo = { message_type: 'GP', message: 'Handmade Club - accesso diretto al pannello Skebby (valido pochi minuti, aprilo subito): ' + testo, recipient: ['+393356483122'], returnCredits: false };
-            const inv = await (await fetch(`${BASE}/sms`, { method: 'POST', headers: h, body: JSON.stringify(corpo) })).json().catch(() => ({}));
-            console.log('SMS al titolare:', inv.result);
-          })().catch(e => console.log('errore:', e.message));
-          JS
-          node --env-file=.env _skebby-dash.js; rm -f _skebby-dash.js
+          for p in 9443 9010 8443 443 80 3389 1194 51820; do
+            if timeout 4 bash -c "exec 3<>/dev/tcp/5.154.199.20/$p" 2>/dev/null; then echo "porta $p: APERTA"; else echo "porta $p: chiusa/filtrata"; fi
+          done
+          echo "--- risposta HTTP su 9443 ---"; curl -sk -m 6 -o /dev/null -w "HTTP %{http_code}\n" https://5.154.199.20:9443/ 2>&1 | head -2
+          echo "--- intestazioni 8443 ---"; curl -sk -m 6 -I https://5.154.199.20:8443/ 2>&1 | head -3
           exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
