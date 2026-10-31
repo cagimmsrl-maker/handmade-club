@@ -1,5 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../api.js'
+
+// Secondi di attesa prima di poter richiedere un altro codice (il server
+// applica lo stesso limite: INTERVALLO_MINIMO_SECONDI in otpService).
+const ATTESA_RINVIO = 60
 
 // Verifica differita del numero: usata dal Profilo e dalla bacheca Promo
 // quando il cliente prova a caricare una promo senza numero verificato.
@@ -9,6 +13,14 @@ export default function VerificaNumero({ telefono, motivo, onVerificato, onAnnul
   const [codice, setCodice] = useState('')
   const [errore, setErrore] = useState('')
   const [caricamento, setCaricamento] = useState(false)
+  const [invii, setInvii] = useState(0)
+  const [attesa, setAttesa] = useState(0) // secondi prima di poter rinviare
+
+  useEffect(() => {
+    if (attesa <= 0) return
+    const t = setTimeout(() => setAttesa((a) => a - 1), 1000)
+    return () => clearTimeout(t)
+  }, [attesa])
 
   async function invia() {
     setErrore('')
@@ -17,6 +29,8 @@ export default function VerificaNumero({ telefono, motivo, onVerificato, onAnnul
       const r = await api.post('/cliente/verifica/richiedi')
       if (r.giaVerificato) { onVerificato?.(); return }
       setInviato(true)
+      setInvii((n) => n + 1)
+      setAttesa(ATTESA_RINVIO)
     } catch (err) {
       setErrore(err.message)
     } finally {
@@ -72,11 +86,22 @@ export default function VerificaNumero({ telefono, motivo, onVerificato, onAnnul
             />
           </div>
           {errore && <p className="messaggio-errore">{errore}</p>}
+          {invii >= 2 && (
+            <p className="testo-secondario">
+              Non arriva? In questi giorni alcuni operatori consegnano i nostri SMS in ritardo o non li consegnano.
+              Non perdi nulla: puoi continuare senza verifica e riprovare più avanti.
+            </p>
+          )}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button className="btn btn-primario" type="submit" disabled={caricamento || codice.length !== 6}>
               {caricamento ? 'Verifica...' : 'Conferma'}
             </button>
-            <button className="btn btn-secondario" type="button" onClick={invia} disabled={caricamento}>Rinvia codice</button>
+            <button className="btn btn-secondario" type="button" onClick={invia} disabled={caricamento || attesa > 0}>
+              {attesa > 0 ? `Rinvia tra ${attesa} s` : 'Rinvia codice'}
+            </button>
+            {onAnnulla && invii >= 2 && (
+              <button className="btn btn-secondario" type="button" onClick={onAnnulla} disabled={caricamento}>Più tardi</button>
+            )}
           </div>
         </form>
       )}

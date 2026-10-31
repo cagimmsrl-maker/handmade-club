@@ -108,6 +108,17 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   codice) e `skebby` (API REST, variabili `SKEBBY_*` nel `.env`). Finché `SMS_PROVIDER=console`,
   la verifica funziona solo leggendo il codice dai log PM2: va attivato Skebby prima di aprire
   l'app ai clienti. Nei log il numero è sempre mascherato.
+  **Stato Skebby (31/10/2026):** tipo `GP` (Classic+), numeri sempre in formato `39…` (`numeroPerSkebby`).
+  `SKEBBY_SENDER` è **vuoto** in produzione dal 30/10: l'alias "HandmadeCl" non è registrato (obbligo
+  AGCOM) — da riattivare solo dopo l'approvazione dell'alias sul pannello Skebby. Problema aperto con
+  ticket Skebby del 31/10: **gli SMS verso numeri WindTre (339/393/344) restano WAIT4DLVR → TIMEOUT**,
+  con o senza alias; verso TIM arrivano. Lo stato di consegna si legge dalle API Skebby
+  (`GET /smshistory`, `GET /sms/{order_id}`): non viene salvato nel DB. Anti-spreco: tra due OTP per lo
+  stesso numero passano almeno 60 s (`INTERVALLO_MINIMO_SECONDI`, 429) e `VerificaNumero` mostra il
+  conto alla rovescia; dal secondo invio avvisa che l'SMS può non arrivare e offre "Più tardi".
+  L'accesso al pannello web Skebby ha una verifica in due passi sul cellulare/email dell'account; in
+  emergenza `GET /API/v1.0/REST/dashboard` restituisce un link di accesso diretto (da mandare via SMS al
+  titolare, mai nei log).
 
 ## Installazione sulla Home (PWA)
 

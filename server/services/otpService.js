@@ -6,6 +6,10 @@ const MAX_TENTATIVI = 3;
 const VALIDITA_MINUTI = 5;
 const MAX_RICHIESTE_PER_NUMERO = 5;
 const FINESTRA_RICHIESTE_MINUTI = 15;
+// Tra due richieste per lo stesso numero devono passare almeno 60 s: chi non
+// riceve l'SMS tende a premere "rinvia" a raffica (31/10/2026: fino a 5 volte
+// in un minuto), e ogni pressione costa un SMS senza cambiare nulla.
+const INTERVALLO_MINIMO_SECONDI = 60;
 
 class ErroreApplicativo extends Error {
   constructor(status, message) {
@@ -26,6 +30,15 @@ async function richiediOtp(telefono) {
   );
   if (rows[0].n >= MAX_RICHIESTE_PER_NUMERO) {
     throw new ErroreApplicativo(429, 'Troppe richieste per questo numero. Riprova più tardi.');
+  }
+  const recente = await pool.query(
+    `SELECT 1 FROM otp_codes
+     WHERE telefono = $1 AND created_at > now() - interval '${INTERVALLO_MINIMO_SECONDI} seconds'
+     LIMIT 1`,
+    [telefono]
+  );
+  if (recente.rows.length > 0) {
+    throw new ErroreApplicativo(429, 'Attendi un minuto prima di richiedere un altro codice.');
   }
 
   const codice = generaCodice();
