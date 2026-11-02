@@ -17,15 +17,21 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Prova porte pubbliche Fiano dal VPS (sola lettura)
+      - name: Stato sincronizzazione TGS (sola lettura)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
-          for p in 9443 9010 8443 443 80 3389 1194 51820; do
-            if timeout 4 bash -c "exec 3<>/dev/tcp/5.154.199.20/$p" 2>/dev/null; then echo "porta $p: APERTA"; else echo "porta $p: chiusa/filtrata"; fi
-          done
-          echo "--- risposta HTTP su 9443 ---"; curl -sk -m 6 -o /dev/null -w "HTTP %{http_code}\n" https://5.154.199.20:9443/ 2>&1 | head -2
-          echo "--- intestazioni 8443 ---"; curl -sk -m 6 -I https://5.154.199.20:8443/ 2>&1 | head -3
+          Q() { sudo -u postgres psql -d handmade_clienti -Atc "$1"; }
+          echo "--- ora server ---"; date '+%d/%m %H:%M:%S'
+          echo "--- chiave TGS: ultimo uso ---"; Q "select etichetta, attiva, to_char(ultimo_uso_il at time zone 'Europe/Rome','DD/MM HH24:MI:SS'), round(extract(epoch from now()-ultimo_uso_il))::int as secondi_fa from tgs_chiavi_api"
+          echo "--- esiti per stato ---"; Q "select stato, count(*) from tgs_sincronizzazioni where sede_id=3 group by 1"
+          echo "--- in attesa (attivi con tessera senza esito Fiano) ---"; Q "select c.id, to_char(c.created_at at time zone 'Europe/Rome','DD/MM HH24:MI') from clienti c join tessere t on t.cliente_id=c.id and t.stato='attiva' where c.stato='attivo' and not exists (select 1 from tgs_sincronizzazioni s where s.cliente_id=c.id and s.sede_id=3) order by c.id"
+          echo "--- errori TGS ---"; Q "select cliente_id, messaggio, to_char(ultimo_esito_il at time zone 'Europe/Rome','DD/MM HH24:MI') from tgs_sincronizzazioni where stato='errore' order by ultimo_esito_il desc limit 10"
+          echo "--- ritardo registrazione→esito (ultimi 25) ---"; Q "select c.id, to_char(c.created_at at time zone 'Europe/Rome','DD/MM HH24:MI') as iscritto, to_char(s.primo_esito_il at time zone 'Europe/Rome','DD/MM HH24:MI') as esito, round(extract(epoch from s.primo_esito_il-c.created_at)/60)::int as minuti, s.stato from clienti c join tgs_sincronizzazioni s on s.cliente_id=c.id and s.sede_id=3 order by c.id desc limit 25"
+          echo "--- iscritti per giorno ---"; Q "select (created_at at time zone 'Europe/Rome')::date, count(*) from clienti where created_at >= '2026-10-31 00:00+01' group by 1 order by 1"
+          echo "--- chiamate TGS per ora oggi e ieri (nginx) ---"; sudo zcat -f /var/log/nginx/club.handmadecafe.it.access.log* 2>/dev/null | grep -E '/api/tgs/' | awk '{print substr($4,2,14)}' | sort | uniq -c | tail -40 || echo "(log nginx non trovato con quel nome)"; ls /var/log/nginx/ | head -20
+          echo "--- risposte non-2xx a TGS ---"; sudo zcat -f /var/log/nginx/*access*.log* 2>/dev/null | grep -E '/api/tgs/' | awk '$9 !~ /^2/ {print $4, $7, $9}' | tail -15
+          echo "--- log app: righe tgs/errori ultime 300 ---"; pm2 logs handmade-club --lines 300 --nostream 2>/dev/null | grep -iE "tgs|error|errore" | grep -v "integrazione cassa spenta" | tail -15
           exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
