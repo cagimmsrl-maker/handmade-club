@@ -2,7 +2,8 @@ const express = require('express');
 const clienteController = require('../controllers/clienteController');
 const authCliente = require('../middleware/authCliente');
 const validate = require('../middleware/validate');
-const { profiloSchema, convenzioneSchema } = require('../schemas/cliente.schema');
+const { profiloSchema, convenzioneSchema, pushIscrizioneSchema, pushDisiscrizioneSchema } = require('../schemas/cliente.schema');
+const pushController = require('../controllers/pushController');
 const { confermaVerificaSchema } = require('../schemas/auth.schema');
 const { limitatoreOtp } = require('../middleware/rateLimiters');
 
@@ -20,6 +21,9 @@ router.put('/profilo', validate(profiloSchema), clienteController.aggiornaProfil
 router.post('/convenzione', validate(convenzioneSchema), clienteController.attivaConvenzione);
 router.delete('/consenso-marketing', clienteController.revocaConsensoMarketing);
 router.post('/consenso-marketing', clienteController.prestaConsensoMarketing);
+router.get('/push/chiave', pushController.chiave);
+router.post('/push/iscrivi', validate(pushIscrizioneSchema), pushController.iscrivi);
+router.post('/push/disiscrivi', validate(pushDisiscrizioneSchema), pushController.disiscrivi);
 router.get('/esporta-dati', clienteController.esportaDati);
 router.post('/cancella-account', clienteController.cancellaAccount);
 

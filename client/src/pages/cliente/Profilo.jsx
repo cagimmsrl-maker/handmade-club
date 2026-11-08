@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api.js'
+import { supportaPush, statoPermesso, iscrizioneLocale, attivaNotifiche, disattivaNotifiche, isIosNonInstallata } from '../../lib/push.js'
 import Testata from '../../components/Testata.jsx'
 import VerificaNumero from '../../components/VerificaNumero.jsx'
 
@@ -188,6 +189,7 @@ export default function Profilo({ onAccountCancellato }) {
             </span>
           </span>
         </label>
+        <InterruttoreNotifiche consensoMarketing={dati.consensoMarketing} onConsenso={() => carica()} />
         <p className="testo-secondario" style={{ fontSize: '0.85rem' }}>
           Informativa accettata il {dati.consensoServizioIl ? new Date(dati.consensoServizioIl).toLocaleDateString('it-IT') : '—'}
           {dati.informativaVersione ? ` (versione ${dati.informativaVersione})` : ''}.{' '}
@@ -210,5 +212,48 @@ export default function Profilo({ onAccountCancellato }) {
         </button>
       </div>
     </div>
+  )
+}
+
+// Notifiche push (migrazione 014): stato reale letto dal browser, non da noi.
+function InterruttoreNotifiche({ consensoMarketing, onConsenso }) {
+  const [attive, setAttive] = useState(null) // null = sto controllando
+  const [lavoro, setLavoro] = useState(false)
+  const [nota, setNota] = useState('')
+  const supportate = supportaPush() && !isIosNonInstallata()
+
+  useEffect(() => {
+    if (!supportate) { setAttive(false); return }
+    iscrizioneLocale().then((s) => setAttive(!!s && statoPermesso() === 'granted')).catch(() => setAttive(false))
+  }, [supportate])
+
+  async function cambia(valore) {
+    setLavoro(true); setNota('')
+    try {
+      if (valore) {
+        if (!consensoMarketing) { await api.post('/cliente/consenso-marketing'); onConsenso?.() }
+        const esito = await attivaNotifiche()
+        if (esito === 'ok') { setAttive(true); setNota('Notifiche attive su questo telefono.') }
+        else if (esito === 'negato') setNota('Permesso negato: riattivalo dalle impostazioni del telefono per questa app.')
+        else setNota('Notifiche non disponibili su questo telefono.')
+      } else {
+        await disattivaNotifiche(); setAttive(false); setNota('Notifiche disattivate su questo telefono.')
+      }
+    } catch (err) { setNota(err.message) }
+    setLavoro(false)
+  }
+
+  return (
+    <label className="campo-interruttore">
+      <input type="checkbox" checked={!!attive} disabled={!supportate || attive === null || lavoro} onChange={(e) => cambia(e.target.checked)} />
+      <span>
+        <strong>Notifiche sul telefono</strong>
+        <span className="testo-secondario" style={{ display: 'block', fontSize: '0.85rem' }}>
+          {!supportaPush() ? 'Questo browser non supporta le notifiche.'
+            : isIosNonInstallata() ? 'Su iPhone servono con l\'app aggiunta alla schermata Home.'
+            : nota || (attive ? 'Ricevi un avviso per le promo nuove.' : 'Un avviso quando c\'è una promo nuova o in scadenza.')}
+        </span>
+      </span>
+    </label>
   )
 }

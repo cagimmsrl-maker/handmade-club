@@ -4,12 +4,15 @@ import { api } from '../../api.js'
 import Testata from '../../components/Testata.jsx'
 import Tessera from '../../components/Tessera.jsx'
 import BannerInstalla from '../../components/BannerInstalla.jsx'
+import BannerNotifiche from '../../components/BannerNotifiche.jsx'
+import { sincronizzaIscrizione } from '../../lib/push.js'
 
 export default function Home() {
   const [dati, setDati] = useState(null)
   const [errore, setErrore] = useState('')
 
   useEffect(() => {
+    sincronizzaIscrizione()
     api
       .get('/cliente/me')
       .then(setDati)
@@ -38,6 +41,7 @@ export default function Home() {
       />
 
       <BannerInstalla />
+      <BannerNotifiche consensoMarketing={dati.consensoMarketing} />
 
       <Link to="/promozioni" className="card card-link">
         <span className="icona" aria-hidden="true">%</span>

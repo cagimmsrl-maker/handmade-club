@@ -36,4 +36,37 @@ async function bloccaTessera(req, res, next) {
   }
 }
 
-module.exports = { elenco, bloccaTessera };
+// Elenco dei clienti con consenso marketing attivo, in CSV, per le
+// comunicazioni fatte a mano (es. WhatsApp dal telefono del locale). SOLO
+// chi ha prestato il consenso e non l'ha revocato: gli altri non si
+// contattano. Telefono in formato internazionale, pronto da salvare.
+async function esportaMarketing(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT c.nome, c.cognome, c.telefono, c.created_at, c.consenso_marketing_il
+       FROM clienti c
+       WHERE c.stato = 'attivo' AND c.consenso_marketing_il IS NOT NULL AND c.consenso_marketing_revocato_il IS NULL
+       ORDER BY c.created_at`
+    );
+    const pulisci = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const tel = (t) => {
+      const cifre = String(t || '').replace(/\D/g, '');
+      return cifre.startsWith('39') ? `+${cifre}` : `+39${cifre}`;
+    };
+    const righe = [
+      ['Nome', 'Cognome', 'Telefono', 'Iscritto il', 'Consenso marketing il'].join(';'),
+      ...rows.map((r) => [
+        pulisci(r.nome), pulisci(r.cognome), pulisci(tel(r.telefono)),
+        pulisci(new Date(r.created_at).toLocaleDateString('it-IT')),
+        pulisci(new Date(r.consenso_marketing_il).toLocaleDateString('it-IT')),
+      ].join(';')),
+    ];
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="clienti-consenso-marketing-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send('\ufeff' + righe.join('\r\n'));
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { elenco, bloccaTessera, esportaMarketing };

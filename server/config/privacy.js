@@ -3,7 +3,7 @@
 // client/src/lib/informativa.js: viene salvata in clienti.informativa_versione
 // alla registrazione, così si sa quale testo ha accettato ogni cliente.
 module.exports = {
-  INFORMATIVA_VERSIONE: '2026-10-21',
+  INFORMATIVA_VERSIONE: '2026-11-09',
   TITOLARE: {
     ragioneSociale: 'CAR FOOD S.r.l.',
     partitaIva: '03560870549',

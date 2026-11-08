@@ -23,7 +23,11 @@ async function anonimizzaInattivi() {
      UPDATE tessere t SET stato = 'revocata' FROM agg WHERE t.cliente_id = agg.id AND t.stato = 'attiva' RETURNING t.cliente_id`,
     [String(MESI_INATTIVITA)]
   );
-  if (rows.length > 0) console.log(`[pulizie] anonimizzati ${rows.length} clienti inattivi da ${MESI_INATTIVITA} mesi`);
+  // Niente più notifiche a chi è stato anonimizzato (migrazione 014).
+  if (rows.length > 0) {
+    await pool.query('DELETE FROM push_iscrizioni WHERE cliente_id = ANY($1::int[])', [rows.map((r) => r.cliente_id)]);
+    console.log(`[pulizie] anonimizzati ${rows.length} clienti inattivi da ${MESI_INATTIVITA} mesi`);
+  }
   return rows.length;
 }
 

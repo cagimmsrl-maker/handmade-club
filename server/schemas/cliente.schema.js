@@ -11,4 +11,17 @@ const convenzioneSchema = z.object({
   codice: z.string().trim().min(1).max(50),
 });
 
-module.exports = { profiloSchema, convenzioneSchema };
+// Iscrizione Web Push: è l'oggetto PushSubscription.toJSON() del browser.
+const pushIscrizioneSchema = z.object({
+  endpoint: z.string().url().max(1000),
+  keys: z.object({
+    p256dh: z.string().min(20).max(200),
+    auth: z.string().min(10).max(100),
+  }),
+});
+
+const pushDisiscrizioneSchema = z.object({
+  endpoint: z.string().url().max(1000),
+});
+
+module.exports = { profiloSchema, convenzioneSchema, pushIscrizioneSchema, pushDisiscrizioneSchema };

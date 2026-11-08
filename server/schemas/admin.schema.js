@@ -60,4 +60,13 @@ const promozioneSchema = z
   .refine((d) => d.tipo !== 'prezzo_fisso' || (d.valore != null && d.valore > 0 && d.prodotto), { message: 'Prezzo fisso: servono prodotto e prezzo', path: ['valore'] })
   .refine((d) => d.tipo !== 'omaggio' || !!d.prodotto, { message: 'Omaggio: indica il prodotto', path: ['prodotto'] });
 
-module.exports = { loginSchema, livelloSchema, convenzioneSchema, sedeSchema, parametriSchema, promozioneSchema };
+// Notifica push dall'admin. url: percorso interno dell'app (es. /promozioni).
+const notificaSchema = z.object({
+  titolo: z.string().trim().min(1).max(60),
+  testo: z.string().trim().min(1).max(200),
+  url: z.string().trim().max(200).regex(/^\/[^\s]*$/, 'Indica un percorso dell\'app, es. /promozioni').optional().nullable().or(z.literal('')),
+  livelloId: z.number().int().positive().optional().nullable(),
+  sedeId: z.number().int().positive().optional().nullable(),
+});
+
+module.exports = { loginSchema, livelloSchema, convenzioneSchema, sedeSchema, parametriSchema, promozioneSchema, notificaSchema };

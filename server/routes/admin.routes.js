@@ -8,6 +8,7 @@ const adminDashboardController = require('../controllers/adminDashboardControlle
 const adminClientiController = require('../controllers/adminClientiController');
 const adminPromozioniController = require('../controllers/adminPromozioniController');
 const tgsController = require('../controllers/tgsController');
+const pushController = require('../controllers/pushController');
 const authAdmin = require('../middleware/authAdmin');
 const validate = require('../middleware/validate');
 const multer = require('multer');
@@ -20,6 +21,7 @@ const {
   sedeSchema,
   parametriSchema,
   promozioneSchema,
+  notificaSchema,
 } = require('../schemas/admin.schema');
 
 const router = express.Router();
@@ -73,6 +75,11 @@ router.post('/promozioni/:id/immagine', conImmagine, adminPromozioniController.c
 router.delete('/promozioni/:id/immagine', adminPromozioniController.rimuoviImmagine);
 
 router.get('/clienti', adminClientiController.elenco);
+router.get('/clienti/export-marketing.csv', adminClientiController.esportaMarketing);
+
+router.get('/notifiche', pushController.riepilogoAdmin);
+router.get('/notifiche/destinatari', pushController.contaAdmin);
+router.post('/notifiche', validate(notificaSchema), pushController.inviaAdmin);
 
 router.get('/tgs/sincronizzazione', tgsController.riepilogoAdmin);
 router.post('/tgs/sincronizzazione/:clienteId/riprova', tgsController.riprovaAdmin);

@@ -264,6 +264,7 @@ async function cancellaAccount(req, res, next) {
       [req.clienteId]
     );
     await pool.query(`UPDATE tessere SET stato = 'revocata' WHERE cliente_id = $1 AND stato = 'attiva'`, [req.clienteId]);
+    await pool.query('DELETE FROM push_iscrizioni WHERE cliente_id = $1', [req.clienteId]); // niente più notifiche (014)
     res.clearCookie(jwtService.NOME_COOKIE.cliente, { path: '/' });
     res.json({ ok: true });
   } catch (err) {

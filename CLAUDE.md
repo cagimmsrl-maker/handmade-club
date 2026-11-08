@@ -184,8 +184,20 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   è il client che ridimensiona la foto prima dell'invio (`client/src/lib/immagini.js`, 1280 px JPEG).
   **La cartella uploads NON è nel backup di deploy.sh** (che salva solo il DB): va inclusa nei backup
   del server.
-- Le notifiche push per avvisare i clienti delle promo arrivano in una fase successiva (richiedono
-  HTTPS su dominio pubblico).
+- **Notifiche push (migrazione 014, 9/11/2026)**: Web Push/VAPID standard, nessun servizio esterno.
+  Chiavi nel `.env` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`; `npm run genera-chiavi-push`,
+  cambiarle = tutte le iscrizioni muoiono); senza chiavi il modulo è spento e l'app non mostra il pulsante.
+  Service worker nostro `client/src/sw.js` (vite-plugin-pwa `injectManifest`): cache come prima + `push` /
+  `notificationclick`. Il cliente attiva da Home (`BannerNotifiche`) o Profilo (`InterruttoreNotifiche`,
+  `lib/push.js`): il browser dà l'iscrizione → `POST /cliente/push/iscrivi` (upsert su `endpoint`, tabella
+  `push_iscrizioni`); su iPhone solo con l'app sulla Home. **Si inviano SOLO a clienti attivi con consenso
+  marketing** (deciso all'invio in `pushService.condizioniDestinatari`, non all'iscrizione): attivare le
+  notifiche presta anche il consenso marketing, detto esplicitamente. Admin `/admin/notifiche`
+  (`POST /admin/notifiche`, filtro livello/sede = TGS o scansioni in quella sede, anteprima destinatari,
+  storico in `notifiche`); 404/410 dal servizio push = iscrizione cancellata; cancellazione account e
+  anonimizzazione cancellano le iscrizioni. `GET /admin/clienti/export-marketing.csv`: elenco (nome,
+  cognome, telefono) dei soli clienti con consenso marketing, per WhatsApp/SMS fatti a mano.
+  Informativa aggiornata (versione 2026-11-09) con l'endpoint push tra i dati tecnici.
 
 ## Integrazione TGS — modello "pull" (specifica TGS v1 del 26/10/2026, migrazioni 008-009) — IN USO
 

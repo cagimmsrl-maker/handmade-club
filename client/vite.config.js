@@ -7,9 +7,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // Il service worker non deve rispondere con index.html alle richieste
-      // di API e foto aperte direttamente (es. /uploads/promozioni/x.jpg).
-      workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//] },
+      // Service worker nostro (src/sw.js): cache dei file come prima più la
+      // ricezione delle notifiche push (migrazione 014). La lista dei file da
+      // mettere in cache la inietta il plugin (self.__WB_MANIFEST).
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      injectManifest: { globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'] },
       includeAssets: ['favicon.png', 'icone/apple-touch-icon.png', 'brand/logo.png', 'brand/logo-chiaro.png'],
       manifest: {
         name: 'Handmade Club',

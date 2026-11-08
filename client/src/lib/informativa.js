@@ -3,7 +3,7 @@
 // cambia il testo, cambiare VERSIONE qui e INFORMATIVA_VERSIONE in
 // server/config/privacy.js (è la versione salvata con il consenso).
 
-export const VERSIONE = '2026-10-21'
+export const VERSIONE = '2026-11-09'
 
 export const TITOLARE = {
   ragioneSociale: 'CAR FOOD S.r.l.',
@@ -22,9 +22,10 @@ export const SEZIONI = [
   {
     titolo: 'Quali dati raccogliamo',
     testo: [
-      'Alla registrazione: nome e numero di telefono (obbligatori); cognome, email e data di nascita (facoltativi).',
+      'Alla registrazione: nome, cognome e numero di telefono (obbligatori); email e data di nascita (facoltativi).',
       'Durante l\'uso: le visite registrate alla cassa quando mostri la tessera (data, ora e locale), il livello raggiunto, l\'eventuale convenzione attivata, le promozioni che carichi e quelle che usi.',
       'Dati tecnici: il cookie di sessione che ti tiene collegato, e l\'indirizzo IP nei log del server per sicurezza (protezione da abusi), conservato per un periodo limitato e poi eliminato.',
+      'Se attivi le notifiche sul telefono: l\'identificativo tecnico (endpoint) che il tuo browser o sistema (Google, Apple, Mozilla) ci assegna per recapitarle, e il tipo di dispositivo. Le notifiche sono promozionali e si attivano solo con il consenso marketing; le puoi disattivare in ogni momento dal profilo o dalle impostazioni del telefono, e l\'identificativo viene eliminato.',
       'Non raccogliamo la tua posizione, non leggiamo la rubrica e non usiamo cookie di profilazione o di terze parti.',
     ],
   },
