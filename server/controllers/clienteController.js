@@ -6,6 +6,13 @@ const otpService = require('../services/otpService');
 const { INFORMATIVA_VERSIONE, TITOLARE } = require('../config/privacy');
 const tgs = require('../services/tgs');
 
+// Verifica del numero via SMS: si può sospendere dal .env senza deploy
+// (VERIFICA_NUMERO_ATTIVA=false) quando gli SMS non arrivano, per non
+// mostrare ai clienti una funzione che non funziona. Default: attiva.
+function verificaNumeroAttiva() {
+  return String(process.env.VERIFICA_NUMERO_ATTIVA ?? 'true').toLowerCase() !== 'false';
+}
+
 async function me(req, res, next) {
   try {
     const { rows } = await pool.query(
@@ -43,6 +50,10 @@ async function me(req, res, next) {
       consensoServizioIl: r.consenso_servizio_il,
       telefono: r.telefono,
       telefonoVerificato: !!r.telefono_verificato,
+      // false = verifica via SMS sospesa (VERIFICA_NUMERO_ATTIVA=false nel
+      // .env, 8/11/2026: gli SMS non vengono consegnati): l'app non la
+      // propone e caricare una promo non la richiede.
+      verificaDisponibile: verificaNumeroAttiva(),
       // codiceQr: contenuto del QR statico (vedi migrazione 003). Il
       // codice umano HC-000042 resta per il cliente e l'assistenza.
       tessera: { codice: r.tessera_codice, codiceQr: r.tessera_codice_qr },
@@ -100,7 +111,7 @@ async function caricaPromozione(req, res, next) {
     // Le promo si caricano solo con numero verificato: è il momento in cui
     // la verifica vale qualcosa per il cliente (vedi migrazione 004).
     const { rows: [c] } = await pool.query('SELECT telefono_verificato FROM clienti WHERE id = $1', [req.clienteId]);
-    if (!c?.telefono_verificato)
+    if (verificaNumeroAttiva() && !c?.telefono_verificato)
       return res.status(403).json({ errore: 'Per caricare le promozioni verifica prima il tuo numero.', codice: 'VERIFICA_RICHIESTA' });
     const esito = await promozioniService.carica(req.clienteId, id);
     if (!esito.ok) return res.status(404).json({ errore: esito.errore });

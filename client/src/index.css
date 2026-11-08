@@ -469,3 +469,13 @@ table.tabella-admin th, table.tabella-admin td {
 .banner-installa-testo .ios-icona { font-size: 1.05rem; color: #0a7aff; }
 .banner-installa-azioni { display: flex; gap: 8px; margin-top: 12px; }
 .banner-installa-azioni .btn { width: auto; padding: 10px 16px; font-size: 0.92rem; }
+
+/* Consenso marketing in registrazione (8/11/2026): in evidenza, perché il 40%
+   dei "no" erano persone che non avevano visto la casella. */
+.campo-checkbox-evidenza {
+  padding: 10px 12px;
+  border: 1px solid var(--terracotta);
+  border-radius: 12px;
+  background: rgba(128, 50, 26, 0.06);
+}
+.campo-checkbox-evidenza input { width: 22px; height: 22px; margin-top: 2px; }

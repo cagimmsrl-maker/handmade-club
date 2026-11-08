@@ -120,9 +120,11 @@ export default function Profilo({ onAccountCancellato }) {
           Numero <strong>{dati.telefono}</strong>{' '}
           {dati.telefonoVerificato
             ? <span className="badge" style={{ background: 'var(--colore-primario)' }}>verificato ✓</span>
-            : <span className="badge" style={{ background: '#999' }}>da verificare</span>}
+            : dati.verificaDisponibile
+              ? <span className="badge" style={{ background: '#999' }}>da verificare</span>
+              : null}
         </p>
-        {!dati.telefonoVerificato && !verificaAperta && (
+        {dati.verificaDisponibile && !dati.telefonoVerificato && !verificaAperta && (
           <>
             <p className="testo-secondario" style={{ marginBottom: 8 }}>
               Verificalo per caricare le promozioni e ricevere le novità. Si fa una volta sola.
@@ -131,7 +133,7 @@ export default function Profilo({ onAccountCancellato }) {
           </>
         )}
       </div>
-      {!dati.telefonoVerificato && verificaAperta && (
+      {dati.verificaDisponibile && !dati.telefonoVerificato && verificaAperta && (
         <VerificaNumero telefono={dati.telefono} onVerificato={() => { setVerificaAperta(false); carica() }} onAnnulla={() => setVerificaAperta(false)} />
       )}
 

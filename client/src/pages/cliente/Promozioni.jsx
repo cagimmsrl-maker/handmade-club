@@ -23,7 +23,7 @@ export default function Promozioni() {
   useEffect(carica, [])
 
   async function caricaPromo(id) {
-    if (me && !me.telefonoVerificato) { setVerificaPer(id); return }
+    if (me && me.verificaDisponibile && !me.telefonoVerificato) { setVerificaPer(id); return }
     setInCorso(id)
     setErrore('')
     try {
@@ -64,7 +64,7 @@ export default function Promozioni() {
           onAnnulla={() => setVerificaPer(null)}
         />
       )}
-      {verificaPer === null && me && !me.telefonoVerificato && disponibili.length > 0 && (
+      {verificaPer === null && me && me.verificaDisponibile && !me.telefonoVerificato && disponibili.length > 0 && (
         <p className="testo-secondario" style={{ fontSize: '0.85rem' }}>
           Per caricare una promo ti chiederemo di verificare il numero (una volta sola).
         </p>

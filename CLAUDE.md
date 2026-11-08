@@ -116,6 +116,9 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   (`GET /smshistory`, `GET /sms/{order_id}`): non viene salvato nel DB. Anti-spreco: tra due OTP per lo
   stesso numero passano almeno 60 s (`INTERVALLO_MINIMO_SECONDI`, 429) e `VerificaNumero` mostra il
   conto alla rovescia; dal secondo invio avvisa che l'SMS può non arrivare e offre "Più tardi".
+  **Sospensione (8/11/2026):** `VERIFICA_NUMERO_ATTIVA=false` nel `.env` (default true) nasconde la verifica
+  nell'app (`/cliente/me` → `verificaDisponibile`) e `carica` non la richiede più; da rimettere a true
+  quando gli SMS arrivano (riavvio `--update-env`, nessun deploy). Il login con codice resta.
   L'accesso al pannello web Skebby ha una verifica in due passi sul cellulare/email dell'account; in
   emergenza `GET /API/v1.0/REST/dashboard` restituisce un link di accesso diretto (da mandare via SMS al
   titolare, mai nei log).

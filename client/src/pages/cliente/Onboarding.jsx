@@ -136,9 +136,14 @@ export default function Onboarding({ onCompletato }) {
         <input id="informativa" type="checkbox" checked={accettaInformativa} onChange={(e) => setAccettaInformativa(e.target.checked)} required />
         <label htmlFor="informativa">Ho letto e accetto l’<Link to="/privacy">informativa privacy</Link> sul trattamento dei miei dati. *</label>
       </div>
-      <div className="campo-checkbox">
+      <div className="campo-checkbox campo-checkbox-evidenza">
         <input id="marketing" type="checkbox" checked={consensoMarketing} onChange={(e) => setConsensoMarketing(e.target.checked)} />
-        <label htmlFor="marketing">Voglio ricevere promozioni e novità via SMS, notifiche o email (facoltativo, lo puoi togliere quando vuoi dal profilo).</label>
+        <label htmlFor="marketing">
+          <strong>Sì, avvisami delle promozioni</strong>
+          <span className="testo-secondario" style={{ display: 'block', fontSize: '0.85rem' }}>
+            Notifiche, SMS o email con sconti e novità. Facoltativo, lo togli quando vuoi dal profilo. Senza, non possiamo avvisarti delle promo.
+          </span>
+        </label>
       </div>
     </>
   )
