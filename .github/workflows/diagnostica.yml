@@ -21,8 +21,8 @@ jobs:
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
-          echo "--- env del processo pm2 ---"; pm2 env $(pm2 id handmade-club | tr -d '[] ') 2>/dev/null | grep -E "^VAPID_PUBLIC_KEY|^VAPID_SUBJECT|^VERIFICA_NUMERO_ATTIVA|^SMS_PROVIDER"
-          echo "--- ultime righe log dal riavvio ---"; pm2 logs handmade-club --lines 40 --nostream 2>/dev/null | grep -E "push|Server|avviat|in ascolto|porta" | tail -4
+          echo "--- env del processo pm2 ---"; pm2 env 1 2>/dev/null | grep -E "VAPID_SUBJECT|VERIFICA_NUMERO_ATTIVA|SMS_PROVIDER"; pm2 env 1 2>/dev/null | grep -c "VAPID_PUBLIC_KEY"; pm2 env 1 2>/dev/null | grep -c "VAPID_PRIVATE_KEY"; pm2 list 2>/dev/null | grep handmade
+          echo "--- ultime righe log dal riavvio ---"; tail -3 ~/.pm2/logs/handmade-club-error.log; echo ...; grep -n "push\]" ~/.pm2/logs/handmade-club-out.log ~/.pm2/logs/handmade-club-error.log 2>/dev/null | tail -3; echo "ultimo avvio:"; grep -n "in ascolto" ~/.pm2/logs/handmade-club-out.log | tail -1
           exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
