@@ -17,39 +17,29 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Prolunga la promo -15% al 30/11 e avvisa in bacheca
+      - name: Chiavi VAPID nel .env + sospensione verifica numero, riavvio
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
-          Q() { sudo -u postgres psql -d handmade_clienti -Atc "$1"; }
-          echo "--- prima ---"; Q "select id, stato, tipo, valore, valido_al, automatica, titolo from promozioni where id=3"
-          if [ "$(Q "select count(*) from promozioni where id=3 and stato='pubblicata' and valido_al='2026-11-08'")" = "1" ]; then
-            sudo -u postgres psql -d handmade_clienti -v ON_ERROR_STOP=1 <<'SQL'
-          BEGIN;
-          UPDATE promozioni SET
-            valido_al = '2026-11-30',
-            titolo = 'Nuova apertura Fiano Romano: −15% per te, fino al 30 novembre',
-            descrizione = 'Benvenuto a Fiano! Per festeggiare la nuova apertura, ai possessori della tessera Handmade Club il 15% di sconto su tutto quello che prendi, prolungato fino al 30 novembre 2026. Escluse bottiglie di vino e bollicine.',
-            updated_at = now()
-          WHERE id = 3;
-          INSERT INTO promozioni (titolo, descrizione, tipo, valore, valido_dal, valido_al, target_sede_id, usi_per_cliente, stato, pubblicata_il, automatica)
-          VALUES ('Buone notizie: la −15% è prolungata fino al 30 novembre',
-                  'La promozione di apertura di Fiano Romano continua: 15% di sconto su tutto per chi ha la tessera Handmade Club, fino al 30 novembre 2026. Mostra la tessera in cassa. Escluse bottiglie di vino e bollicine.',
-                  'messaggio', NULL, '2026-11-08', '2026-11-30', 3, NULL, 'pubblicata', now(), true);
-          INSERT INTO promozioni_clienti (promozione_id, cliente_id)
-          SELECT p.id, c.id FROM promozioni p
-            JOIN clienti c ON c.stato = 'attivo'
-            JOIN tessere t ON t.cliente_id = c.id AND t.stato = 'attiva'
-           WHERE p.automatica = true AND p.stato = 'pubblicata'
-          ON CONFLICT (promozione_id, cliente_id) DO NOTHING;
-          COMMIT;
-          SQL
-            echo "--- dopo ---"; Q "select id, stato, tipo, valido_al, automatica, titolo from promozioni where stato='pubblicata' order by id"
-            echo "--- caricamenti ---"; Q "select promozione_id, count(*) from promozioni_clienti group by 1 order by 1"
+          cd /var/www/handmade-club/server || exit 1
+          cp -a .env ".env.bak-$(date +%Y%m%d-%H%M%S)" && echo "backup .env fatto"
+          if grep -q '^VAPID_PUBLIC_KEY=.\+' .env; then
+            echo "chiavi VAPID già presenti: non le tocco"
           else
-            echo "ATTENZIONE: promo 3 non nello stato atteso, non tocco nulla"
+            sed -i '/^VAPID_PUBLIC_KEY=/d; /^VAPID_PRIVATE_KEY=/d; /^VAPID_SUBJECT=/d' .env
+            node -e "
+              const w = require('web-push'); const k = w.generateVAPIDKeys(); const fs = require('fs');
+              fs.appendFileSync('.env', '\n# Notifiche push (Web Push), chiavi generate il ' + new Date().toISOString().slice(0,10) + '. Cambiarle = tutte le iscrizioni muoiono.\nVAPID_PUBLIC_KEY=' + k.publicKey + '\nVAPID_PRIVATE_KEY=' + k.privateKey + '\nVAPID_SUBJECT=mailto:privacy@handmadecafe.it\n');
+              console.log('chiavi VAPID scritte nel .env (pubblica lunga ' + k.publicKey.length + ', privata non mostrata)');
+            "
           fi
-          echo "--- contatti con consenso marketing (per l'avviso) ---"; Q "select count(*) filter (where consenso_marketing_il is not null and consenso_marketing_revocato_il is null), count(*) from clienti where stato='attivo'" 2>&1
+          if grep -q '^VERIFICA_NUMERO_ATTIVA=' .env; then sed -i 's/^VERIFICA_NUMERO_ATTIVA=.*/VERIFICA_NUMERO_ATTIVA=false/' .env; else printf '\n# 8/11/2026: verifica SMS sospesa finché gli SMS non arrivano (Skebby)\nVERIFICA_NUMERO_ATTIVA=false\n' >> .env; fi
+          echo "VERIFICA_NUMERO_ATTIVA=$(grep '^VERIFICA_NUMERO_ATTIVA=' .env | cut -d= -f2)"
+          pm2 restart handmade-club --update-env >/dev/null && sleep 4 && pm2 describe handmade-club | grep -E "status" | head -1
+          echo "--- log avvio ---"; pm2 logs handmade-club --lines 15 --nostream 2>/dev/null | grep -iE "push|vapid|avviat|error" | tail -5
+          echo "--- chiave pubblica esposta dall'API (dietro login: atteso 401) ---"; curl -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:3002/api/cliente/push/chiave
+          echo "--- check ---"; cd /var/www/handmade-club && ./scripts/check.sh 2>&1 | tail -3
+          exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -s' < /tmp/cmd.sh
