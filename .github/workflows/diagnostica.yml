@@ -17,28 +17,12 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Chiavi VAPID nel .env + sospensione verifica numero, riavvio
+      - name: Verifica chiavi push caricate dal processo (sola lettura)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
-          cd /var/www/handmade-club/server || exit 1
-          cp -a .env ".env.bak-$(date +%Y%m%d-%H%M%S)" && echo "backup .env fatto"
-          if grep -q '^VAPID_PUBLIC_KEY=.\+' .env; then
-            echo "chiavi VAPID già presenti: non le tocco"
-          else
-            sed -i '/^VAPID_PUBLIC_KEY=/d; /^VAPID_PRIVATE_KEY=/d; /^VAPID_SUBJECT=/d' .env
-            node -e "
-              const w = require('web-push'); const k = w.generateVAPIDKeys(); const fs = require('fs');
-              fs.appendFileSync('.env', '\n# Notifiche push (Web Push), chiavi generate il ' + new Date().toISOString().slice(0,10) + '. Cambiarle = tutte le iscrizioni muoiono.\nVAPID_PUBLIC_KEY=' + k.publicKey + '\nVAPID_PRIVATE_KEY=' + k.privateKey + '\nVAPID_SUBJECT=mailto:privacy@handmadecafe.it\n');
-              console.log('chiavi VAPID scritte nel .env (pubblica lunga ' + k.publicKey.length + ', privata non mostrata)');
-            "
-          fi
-          if grep -q '^VERIFICA_NUMERO_ATTIVA=' .env; then sed -i 's/^VERIFICA_NUMERO_ATTIVA=.*/VERIFICA_NUMERO_ATTIVA=false/' .env; else printf '\n# 8/11/2026: verifica SMS sospesa finché gli SMS non arrivano (Skebby)\nVERIFICA_NUMERO_ATTIVA=false\n' >> .env; fi
-          echo "VERIFICA_NUMERO_ATTIVA=$(grep '^VERIFICA_NUMERO_ATTIVA=' .env | cut -d= -f2)"
-          pm2 restart handmade-club --update-env >/dev/null && sleep 4 && pm2 describe handmade-club | grep -E "status" | head -1
-          echo "--- log avvio ---"; pm2 logs handmade-club --lines 15 --nostream 2>/dev/null | grep -iE "push|vapid|avviat|error" | tail -5
-          echo "--- chiave pubblica esposta dall'API (dietro login: atteso 401) ---"; curl -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:3002/api/cliente/push/chiave
-          echo "--- check ---"; cd /var/www/handmade-club && ./scripts/check.sh 2>&1 | tail -3
+          echo "--- env del processo pm2 ---"; pm2 env $(pm2 id handmade-club | tr -d '[] ') 2>/dev/null | grep -E "^VAPID_PUBLIC_KEY|^VAPID_SUBJECT|^VERIFICA_NUMERO_ATTIVA|^SMS_PROVIDER"
+          echo "--- ultime righe log dal riavvio ---"; pm2 logs handmade-club --lines 40 --nostream 2>/dev/null | grep -E "push|Server|avviat|in ascolto|porta" | tail -4
           exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
