@@ -17,15 +17,20 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Stato processo e log dopo il riavvio (sola lettura)
+      - name: Tessere, TGS, notifiche (sola lettura)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set +e
-          pm2 describe handmade-club 2>/dev/null | grep -E "status|restarts|uptime|created at|script path" 
-          echo "--- ultime 25 righe di log (ordine reale) ---"
-          pm2 logs handmade-club --lines 25 --nostream --timestamp "HH:mm:ss" 2>/dev/null | grep -vE "^\s*$|\[TAILING\]|last 25 lines" | tail -25
-          echo "--- .env: chiavi presenti? ---"; cd /var/www/handmade-club/server && grep -c "^VAPID_PUBLIC_KEY=.\{20,\}" .env; grep -c "^VAPID_PRIVATE_KEY=.\{20,\}" .env; grep "^VERIFICA_NUMERO_ATTIVA" .env
-          echo "--- il processo le vede? (stesso caricamento dotenv dell'app) ---"; node -e "require('dotenv').config(); console.log('pub', (process.env.VAPID_PUBLIC_KEY||'').length, 'priv', (process.env.VAPID_PRIVATE_KEY||'').length, 'verifica', process.env.VERIFICA_NUMERO_ATTIVA)"
+          Q() { sudo -u postgres psql -d handmade_clienti -Atc "$1"; }
+          echo "--- ora ---"; date '+%d/%m %H:%M'
+          echo "--- totale attivi / consenso marketing ---"; Q "select count(*), count(*) filter (where consenso_marketing_il is not null and consenso_marketing_revocato_il is null) from clienti where stato='attivo'"
+          echo "--- iscritti per giorno dal 6/11 ---"; Q "select to_char(created_at at time zone 'Europe/Rome','DD/MM'), count(*) from clienti where created_at >= '2026-11-06 00:00+01' group by 1 order by min(created_at)"
+          echo "--- oggi per ora ---"; Q "select to_char(created_at at time zone 'Europe/Rome','HH24'), count(*) from clienti where created_at >= '2026-11-09 00:00+01' group by 1 order by 1"
+          echo "--- consenso marketing tra gli iscritti di oggi ---"; Q "select count(*) filter (where consenso_marketing_il is not null), count(*) from clienti where created_at >= '2026-11-09 00:00+01'"
+          echo "--- TGS ultimo uso s / esiti / attesa / errori ---"; Q "select round(extract(epoch from now()-ultimo_uso_il))::int from tgs_chiavi_api where attiva"; Q "select stato, count(*) from tgs_sincronizzazioni where sede_id=3 group by 1"; Q "select count(*) from clienti c join tessere t on t.cliente_id=c.id and t.stato='attiva' where c.stato='attivo' and not exists (select 1 from tgs_sincronizzazioni s where s.cliente_id=c.id and s.sede_id=3)"; Q "select count(*) from tgs_sincronizzazioni where stato='errore'"
+          echo "--- push: telefoni iscritti / clienti / notifiche inviate ---"; Q "select (select count(*) from push_iscrizioni), (select count(distinct cliente_id) from push_iscrizioni), (select count(*) from notifiche)"
+          echo "--- notifiche inviate ---"; Q "select to_char(created_at at time zone 'Europe/Rome','DD/MM HH24:MI'), titolo, destinatari, consegnate, fallite from notifiche order by id"
+          echo "--- promo pubblicate / caricamenti ---"; Q "select p.id, p.tipo, p.valido_al, count(pc.id) from promozioni p left join promozioni_clienti pc on pc.promozione_id=p.id where p.stato='pubblicata' group by p.id order by p.id"
           exit 0
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
