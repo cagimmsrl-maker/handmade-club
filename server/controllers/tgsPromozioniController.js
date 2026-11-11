@@ -4,6 +4,7 @@
 
 const pool = require('../db/pool');
 const livelloService = require('../services/livelloService');
+const promozioniService = require('../services/promozioniService');
 const { isoConFuso } = require('./tgsController');
 
 const LIMITE_DEFAULT = 50;
@@ -170,4 +171,49 @@ async function passaggio(req, res, next) {
   }
 }
 
-module.exports = { promozioniDaSincronizzare, esitoPromozione, passaggio };
+// GET /api/tgs/clienti/:qrCode — v3 (Handmade Cassa, 11/11/2026): chi è il
+// cliente di questa tessera e cosa gli spetta ADESSO in questa sede
+// (livello, convenzione, promo caricate utilizzabili). Sola lettura: non
+// registra una scansione — la visita e le promo usate arrivano dopo con
+// POST /passaggi quando il conto si chiude. Per le promo si dà anche
+// `promozioneClienteId`, che è l'id da rimandare in `promozioniUsate`.
+async function cliente(req, res, next) {
+  try {
+    const qr = String(req.params.qrCode || '').trim().toUpperCase();
+    if (qr.length < 6 || qr.length > 50) return res.status(404).json({ errore: 'QR code non riconosciuto o tessera non attiva.' });
+    const { rows } = await pool.query(
+      `SELECT c.id, c.nome, c.cognome, c.telefono, c.email, t.codice_qr,
+              l.nome AS livello_nome, l.sconto_percentuale AS livello_sconto, l.colore AS livello_colore,
+              conv.nome AS convenzione_nome, conv.sconto_percentuale AS convenzione_sconto
+         FROM tessere t
+         JOIN clienti c ON c.id = t.cliente_id
+         LEFT JOIN livelli l ON l.id = c.livello_id
+         LEFT JOIN convenzioni conv ON conv.id = c.convenzione_id AND conv.attiva = true
+        WHERE t.codice_qr = $1 AND t.stato = 'attiva' AND c.stato = 'attivo'`,
+      [qr]
+    );
+    const c = rows[0];
+    if (!c) return res.status(404).json({ errore: 'QR code non riconosciuto o tessera non attiva.' });
+
+    const promozioni = await promozioniService.caricateUtilizzabili(c.id, req.tgs.sedeId);
+    const { rows: caricate } = await pool.query(
+      'SELECT id, promozione_id FROM promozioni_clienti WHERE cliente_id = $1', [c.id]
+    );
+    const pcPerPromo = new Map(caricate.map(x => [x.promozione_id, x.id]));
+
+    res.json({
+      cliente: { id: c.id, nome: c.nome, cognome: c.cognome || '', telefono: c.telefono, email: c.email, codiceQr: c.codice_qr },
+      livello: c.livello_nome ? { nome: c.livello_nome, scontoPercentuale: Number(c.livello_sconto), colore: c.livello_colore } : null,
+      convenzione: c.convenzione_nome ? { nome: c.convenzione_nome, scontoPercentuale: Number(c.convenzione_sconto) } : null,
+      promozioni: promozioni.map(p => ({
+        id: p.id, promozioneClienteId: pcPerPromo.get(p.id) ?? null,
+        titolo: p.titolo, descrizione: p.descrizione, tipo: p.tipo, valore: p.valore, prodotto: p.prodotto,
+        usiRimasti: p.usiPerCliente == null ? null : p.usiPerCliente - p.usi,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { promozioniDaSincronizzare, esitoPromozione, passaggio, cliente };

@@ -158,6 +158,17 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   successiva — strutturare il codice della scansione in modo che il punto di aggancio sia isolato
   (un service `cassaService` oggi vuoto/log-only).
 
+## Handmade Cassa (11/11/2026)
+
+La cassa propria di CAR FOOD (repo `handmade-cassa`, cassa.handmadecafe.it) usa le STESSE API del
+servizio TGS (`/api/tgs/*`, `X-Api-Key` per sede da `npm run crea-chiave-tgs`): per la cassa Pontani
+si genera una chiave con la sede Pontani. In più, solo per lei:
+- `GET /api/tgs/clienti/:qrCode` → cliente della tessera (nome, cognome, telefono, email), livello
+  con sconto, convenzione, promo caricate utilizzabili ora in quella sede con `promozioneClienteId`
+  (l'id da rimandare in `promozioniUsate`). Sola lettura: NON registra la scansione.
+- La visita e le promo usate arrivano con `POST /api/tgs/passaggi` alla chiusura del conto
+  (`numeroScontrino` = "<sede>-<giorno>-<numero conto>", idempotente).
+
 ## Logica di dominio — Promozioni "da caricare" (migrazione 003)
 
 - L'admin crea una promozione (`/admin/promozioni`): tipo `sconto_percentuale` | `prezzo_fisso` |

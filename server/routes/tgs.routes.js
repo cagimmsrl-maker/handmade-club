@@ -35,4 +35,7 @@ router.get('/promozioni-da-sincronizzare', tgsPromo.promozioniDaSincronizzare);
 router.post('/promozioni/:id/esito', valida422(esitoPromozioneSchema), tgsPromo.esitoPromozione);
 router.post('/passaggi', valida422(passaggioSchema), tgsPromo.passaggio);
 
+// v3 — Handmade Cassa: lettura del cliente dalla tessera (nessuna scansione registrata)
+router.get('/clienti/:qrCode', tgsPromo.cliente);
+
 module.exports = router;
