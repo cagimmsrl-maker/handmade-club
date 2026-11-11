@@ -166,6 +166,9 @@ si genera una chiave con la sede Pontani. In più, solo per lei:
 - `GET /api/tgs/clienti/:qrCode` → cliente della tessera (nome, cognome, telefono, email), livello
   con sconto, convenzione, promo caricate utilizzabili ora in quella sede con `promozioneClienteId`
   (l'id da rimandare in `promozioniUsate`). Sola lettura: NON registra la scansione.
+- `GET /api/tgs/clienti?dopo=<id>&limite=200` → elenco a pagine di tutti i clienti attivi con
+  tessera (id, nome, cognome, telefono, email, qrCode); la cassa lo usa per tenere allineata la
+  sua anagrafica (ricerca per nome al banco). `prossimo` = id da cui ripartire, null alla fine.
 - La visita e le promo usate arrivano con `POST /api/tgs/passaggi` alla chiusura del conto
   (`numeroScontrino` = "<sede>-<giorno>-<numero conto>", idempotente).
 

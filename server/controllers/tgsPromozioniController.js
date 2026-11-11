@@ -216,4 +216,27 @@ async function cliente(req, res, next) {
   }
 }
 
-module.exports = { promozioniDaSincronizzare, esitoPromozione, passaggio, cliente };
+// GET /api/tgs/clienti?dopo=0&limite=200 — v3 (Handmade Cassa): elenco di
+// tutti i clienti attivi con tessera attiva, a pagine per id crescente,
+// per tenere allineata l'anagrafica della cassa (ricerca per nome al banco).
+// Sola lettura. `prossimo` = id da cui ripartire, null alla fine.
+async function elencoClienti(req, res, next) {
+  try {
+    const dopo = Math.max(0, parseInt(req.query.dopo, 10) || 0);
+    const limite = Math.min(500, Math.max(1, parseInt(req.query.limite, 10) || 200));
+    const { rows } = await pool.query(
+      `SELECT c.id, c.nome, c.cognome, c.telefono, c.email, t.codice_qr, c.created_at
+         FROM clienti c JOIN tessere t ON t.cliente_id = c.id AND t.stato = 'attiva'
+        WHERE c.stato = 'attivo' AND c.id > $1
+        ORDER BY c.id LIMIT $2`, [dopo, limite]
+    );
+    res.json({
+      clienti: rows.map(c => ({ id: c.id, nome: c.nome, cognome: c.cognome || '', telefono: c.telefono, email: c.email, qrCode: c.codice_qr, registratoIl: c.created_at })),
+      prossimo: rows.length === limite ? rows[rows.length - 1].id : null,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { promozioniDaSincronizzare, esitoPromozione, passaggio, cliente, elencoClienti };
