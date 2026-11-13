@@ -24,9 +24,9 @@ jobs:
           Q() { sudo -u postgres psql -d handmade_clienti -Atc "$1"; }
           echo "--- ora ---"; date '+%d/%m %H:%M'
           echo "--- totale attivi / consenso marketing ---"; Q "select count(*), count(*) filter (where consenso_marketing_il is not null and consenso_marketing_revocato_il is null) from clienti where stato='attivo'"
-          echo "--- iscritti per giorno dal 6/11 ---"; Q "select to_char(created_at at time zone 'Europe/Rome','DD/MM'), count(*) from clienti where created_at >= '2026-11-07 00:00+01' group by 1 order by min(created_at)"
-          echo "--- oggi per ora ---"; Q "select to_char(created_at at time zone 'Europe/Rome','HH24'), count(*) from clienti where created_at >= '2026-11-11 00:00+01' group by 1 order by 1"
-          echo "--- consenso marketing tra gli iscritti di oggi ---"; Q "select count(*) filter (where consenso_marketing_il is not null), count(*) from clienti where created_at >= '2026-11-11 00:00+01'"
+          echo "--- iscritti per giorno dal 6/11 ---"; Q "select to_char(created_at at time zone 'Europe/Rome','DD/MM'), count(*) from clienti where created_at >= '2026-11-09 00:00+01' group by 1 order by min(created_at)"
+          echo "--- oggi per ora ---"; Q "select to_char(created_at at time zone 'Europe/Rome','HH24'), count(*) from clienti where created_at >= '2026-11-13 00:00+01' group by 1 order by 1"
+          echo "--- consenso marketing tra gli iscritti di oggi ---"; Q "select count(*) filter (where consenso_marketing_il is not null), count(*) from clienti where created_at >= '2026-11-13 00:00+01'"
           echo "--- TGS ultimo uso s / esiti / attesa / errori ---"; Q "select round(extract(epoch from now()-ultimo_uso_il))::int from tgs_chiavi_api where attiva"; Q "select stato, count(*) from tgs_sincronizzazioni where sede_id=3 group by 1"; Q "select count(*) from clienti c join tessere t on t.cliente_id=c.id and t.stato='attiva' where c.stato='attivo' and not exists (select 1 from tgs_sincronizzazioni s where s.cliente_id=c.id and s.sede_id=3)"; Q "select count(*) from tgs_sincronizzazioni where stato='errore'"
           echo "--- push: telefoni iscritti / clienti / notifiche inviate ---"; Q "select (select count(*) from push_iscrizioni), (select count(distinct cliente_id) from push_iscrizioni), (select count(*) from notifiche)"
           echo "--- notifiche inviate ---"; Q "select to_char(created_at at time zone 'Europe/Rome','DD/MM HH24:MI'), titolo, destinatari, consegnate, fallite from notifiche order by id"
