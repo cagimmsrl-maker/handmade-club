@@ -5,6 +5,7 @@ import Testata from '../../components/Testata.jsx'
 import Tessera from '../../components/Tessera.jsx'
 import BannerInstalla from '../../components/BannerInstalla.jsx'
 import BannerNotifiche from '../../components/BannerNotifiche.jsx'
+import InvitoNotifiche from '../../components/InvitoNotifiche.jsx'
 import { sincronizzaIscrizione } from '../../lib/push.js'
 
 export default function Home() {
@@ -31,6 +32,9 @@ export default function Home() {
   return (
     <div className="schermo">
       <Testata saluto="Ciao," nome={dati.nome} />
+
+      <InvitoNotifiche invito={dati.invitoNotifiche} consensoMarketing={dati.consensoMarketing}
+                       onAttivate={() => setDati((d) => ({ ...d, consensoMarketing: true }))} />
 
       <Tessera
         nome={`${dati.nome}${dati.cognome ? ' ' + dati.cognome : ''}`}

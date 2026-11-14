@@ -215,6 +215,11 @@ si genera una chiave con la sede Pontani. In più, solo per lei:
   anonimizzazione cancellano le iscrizioni. `GET /admin/clienti/export-marketing.csv`: elenco (nome,
   cognome, telefono) dei soli clienti con consenso marketing, per WhatsApp/SMS fatti a mano.
   Informativa aggiornata (versione 2026-11-09) con l'endpoint push tra i dati tecnici.
+  **Invito a schermo intero (15/11/2026)**: `InvitoNotifiche.jsx` compare in Home, sopra la tessera, a chi non ha
+  le notifiche attive (su iPhone non installata: guida alla Home); "Non ora" lo rimanda di 24 h (localStorage).
+  Testo e accensione dal `.env` senza deploy (`INVITO_NOTIFICHE_ATTIVO`, `_TITOLO`, `_TESTO` → `/cliente/me` →
+  `invitoNotifiche`, `pm2 restart --update-env`): si cambia per la settimana di una promo. Il tocco del cliente
+  resta obbligatorio: nessun sito può iscrivere un telefono alle push da solo, e il consenso forzato non vale.
 
 ## Integrazione TGS — modello "pull" (specifica TGS v1 del 26/10/2026, migrazioni 008-009) — IN USO
 

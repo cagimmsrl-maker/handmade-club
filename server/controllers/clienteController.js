@@ -13,6 +13,20 @@ function verificaNumeroAttiva() {
   return String(process.env.VERIFICA_NUMERO_ATTIVA ?? 'true').toLowerCase() !== 'false';
 }
 
+// Invito a schermo intero ad attivare le notifiche (15/11/2026): compare in
+// Home a chi non le ha attive. Testo e accensione dal .env, senza deploy:
+// INVITO_NOTIFICHE_ATTIVO=false lo spegne, INVITO_NOTIFICHE_TITOLO /
+// INVITO_NOTIFICHE_TESTO cambiano il messaggio (es. per la settimana di
+// una promo). Default: acceso, testo generico.
+function invitoNotifiche() {
+  if (String(process.env.INVITO_NOTIFICHE_ATTIVO ?? 'true').toLowerCase() === 'false') return null;
+  return {
+    titolo: process.env.INVITO_NOTIFICHE_TITOLO || 'Attiva le notifiche',
+    testo: process.env.INVITO_NOTIFICHE_TESTO
+      || 'Questa settimana grandi promozioni riservate a chi ha le notifiche attive: attivale adesso e non te le perdi.',
+  };
+}
+
 async function me(req, res, next) {
   try {
     const { rows } = await pool.query(
@@ -54,6 +68,7 @@ async function me(req, res, next) {
       // .env, 8/11/2026: gli SMS non vengono consegnati): l'app non la
       // propone e caricare una promo non la richiede.
       verificaDisponibile: verificaNumeroAttiva(),
+      invitoNotifiche: invitoNotifiche(),
       // codiceQr: contenuto del QR statico (vedi migrazione 003). Il
       // codice umano HC-000042 resta per il cliente e l'assistenza.
       tessera: { codice: r.tessera_codice, codiceQr: r.tessera_codice_qr },
