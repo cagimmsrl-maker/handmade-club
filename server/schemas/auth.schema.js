@@ -30,6 +30,9 @@ const registraSchema = z.object({
   email: z.string().trim().email('Email non valida').max(100).optional().nullable().or(z.literal('')),
   dataNascita: z.string().date().optional().nullable().or(z.literal('')),
   consensoMarketing: z.boolean().default(false),
+  // Canale di acquisizione (?da= del link, migrazione 015): solo lettere,
+  // cifre, trattini; qualunque altra cosa viene ignorata, non rifiutata.
+  origine: z.string().trim().toLowerCase().regex(/^[a-z0-9_-]{1,40}$/).optional().nullable().or(z.literal('')),
 });
 
 const confermaVerificaSchema = z.object({

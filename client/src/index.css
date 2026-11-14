@@ -505,3 +505,17 @@ table.tabella-admin th, table.tabella-admin td {
 .invito-nota { font-size: 0.82rem; }
 .invito-scheda .btn { margin-top: 4px; }
 .invito-rinvia { display: block; margin: 14px auto 0; }
+
+/* Offerta di benvenuto prima della registrazione (15/11/2026) */
+.offerta-benvenuto {
+  background: var(--terracotta);
+  color: #fff;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin: 0 0 14px;
+  text-align: center;
+}
+.offerta-etichetta { display: block; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.85; }
+.offerta-titolo { display: block; font-size: 1.35rem; line-height: 1.2; margin: 4px 0 2px; }
+.offerta-benvenuto p { margin: 4px 0 0; font-size: 0.9rem; opacity: 0.95; }
+.offerta-benvenuto-compatta { margin: 0 0 18px; }

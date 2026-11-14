@@ -4,6 +4,7 @@ import {
   osservaInstallazione, mostraPromptInstallazione, giaInstallata, isIos, isSafari, isAndroid,
   meglioInChrome, urlApriInChrome, provaSaltoAChrome,
 } from '../../lib/installa.js'
+import OffertaBenvenuto from '../../components/OffertaBenvenuto.jsx'
 
 // Pagina di atterraggio del QR al banco: prima di tutto mette l'app sulla
 // Home, poi manda alla registrazione. Su iPhone l'ordine conta: l'app
@@ -146,6 +147,7 @@ export default function Installa() {
         <img src="/icone/icona-192.png" alt="" width={84} height={84} />
         <span>Handmade Club</span>
       </div>
+      <OffertaBenvenuto compatto />
       {contenuto}
     </div>
   )

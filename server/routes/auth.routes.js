@@ -11,5 +11,6 @@ router.post('/verifica-otp', limitatoreOtp(), validate(verificaOtpSchema), authC
 router.post('/completa-profilo', validate(completaProfiloSchema), authController.completaProfilo);
 router.post('/registra', limitatoreRegistrazione(), validate(registraSchema), authController.registra);
 router.post('/logout', authController.logout);
+router.get('/offerta', authController.offerta);
 
 module.exports = router;

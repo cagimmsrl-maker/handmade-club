@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api.js'
+import { origineRicordata, dimenticaOrigine } from '../../lib/origine.js'
+import OffertaBenvenuto from '../../components/OffertaBenvenuto.jsx'
 
 // Ingresso: "entri subito, verifichi dopo". La tessera si crea con nome e
 // telefono, senza codice. L'OTP serve solo a chi ha già la tessera e deve
@@ -34,6 +36,7 @@ export default function Onboarding({ onCompletato }) {
       email: email || undefined,
       dataNascita: dataNascita || undefined,
       consensoMarketing,
+      origine: origineRicordata(),
     }
   }
 
@@ -48,6 +51,7 @@ export default function Onboarding({ onCompletato }) {
     setCaricamento(true)
     try {
       await api.post('/auth/registra', { telefono, ...profiloPayload() })
+      dimenticaOrigine()
       onCompletato()
     } catch (err) {
       if (err.status === 409) {
@@ -154,6 +158,8 @@ export default function Onboarding({ onCompletato }) {
         <img src="/brand/logo.png" alt="Handmade Café" />
         <p>La tessera fedeltà di Handmade Café: visite, livelli e promozioni, sul tuo telefono.</p>
       </div>
+
+      {modo === MODO_REGISTRA && <OffertaBenvenuto />}
 
       {modo === MODO_REGISTRA && (
         <form className="card" onSubmit={registra}>

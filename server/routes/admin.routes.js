@@ -76,6 +76,7 @@ router.delete('/promozioni/:id/immagine', adminPromozioniController.rimuoviImmag
 
 router.get('/clienti', adminClientiController.elenco);
 router.get('/clienti/export-marketing.csv', adminClientiController.esportaMarketing);
+router.get('/clienti/origini', adminClientiController.origini);
 
 router.get('/notifiche', pushController.riepilogoAdmin);
 router.get('/notifiche/destinatari', pushController.contaAdmin);

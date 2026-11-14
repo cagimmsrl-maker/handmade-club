@@ -142,6 +142,7 @@ async function registra(req, res, next) {
   const client = await pool.connect();
   try {
     const { nome, cognome, email, dataNascita, consensoMarketing } = req.body;
+    const origine = req.body.origine || null;
     const telefono = normalizzaTelefono(req.body.telefono);
 
     await client.query('BEGIN');
@@ -160,11 +161,11 @@ async function registra(req, res, next) {
     const { rows: clienteRows } = await client.query(
       `INSERT INTO clienti
         (telefono, telefono_verificato, email, nome, cognome, data_nascita, livello_id,
-         consenso_servizio_il, consenso_marketing_il, informativa_versione)
-       VALUES ($1, false, $2, $3, $4, $5, $6, now(), $7, $8)
+         consenso_servizio_il, consenso_marketing_il, informativa_versione, origine)
+       VALUES ($1, false, $2, $3, $4, $5, $6, now(), $7, $8, $9)
        RETURNING id`,
       [telefono, email || null, nome, cognome || null, dataNascita || null,
-       livelloBase[0]?.id || null, consensoMarketing ? new Date() : null, INFORMATIVA_VERSIONE]
+       livelloBase[0]?.id || null, consensoMarketing ? new Date() : null, INFORMATIVA_VERSIONE, origine]
     );
     const cliente = clienteRows[0];
     await inserisciTessera(client, cliente.id, `HC-${String(cliente.id).padStart(6, '0')}`);
@@ -184,9 +185,20 @@ async function registra(req, res, next) {
   }
 }
 
+// GET /auth/offerta — testo dell'offerta di benvenuto mostrato PRIMA della
+// registrazione (pagina /installa e modulo "Crea la tua tessera"), così chi
+// arriva da una pubblicità sa cosa ottiene. Dal .env, senza deploy:
+// OFFERTA_BENVENUTO_TITOLO / OFFERTA_BENVENUTO_TESTO; vuoti = niente riquadro.
+function offerta(req, res) {
+  const titolo = (process.env.OFFERTA_BENVENUTO_TITOLO || '').trim();
+  const testo = (process.env.OFFERTA_BENVENUTO_TESTO || '').trim();
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json(titolo || testo ? { titolo, testo } : null);
+}
+
 async function logout(req, res) {
   res.clearCookie(jwtService.NOME_COOKIE.cliente, { path: '/' });
   res.json({ ok: true });
 }
 
-module.exports = { richiediOtp, verificaOtp, completaProfilo, registra, logout };
+module.exports = { richiediOtp, verificaOtp, completaProfilo, registra, logout, offerta };

@@ -143,6 +143,14 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   (`provaSaltoAChrome`, alcuni browser lo bloccano senza tocco) e poi compare "Continua con Chrome"; nel
   banner dentro l'app solo il pulsante. Chrome e iPhone invariati. Non è una versione di Android a decidere,
   è il browser.
+- **Offerta prima della registrazione e canale di acquisizione (15/11/2026, migrazione 015).**
+  `OffertaBenvenuto.jsx` mostra su `/installa` e su "Crea la tua tessera" il riquadro con l'offerta corrente
+  (`GET /auth/offerta` ← `.env` `OFFERTA_BENVENUTO_TITOLO/_TESTO`, vuoti = nessun riquadro; si cambia con
+  `pm2 restart --update-env`, senza deploy). Il link pubblicato porta `?da=<canale>` (`/installa?da=instagram`,
+  `sacchetto`, `vetrina`, nome azienda…): `lib/origine.js` lo legge in `main.jsx` prima del render, lo tiene in
+  localStorage e `/auth/registra` lo salva in `clienti.origine` (NULL = banco/non noto). Conteggio per canale
+  in admin → Clienti (`GET /admin/clienti/origini`, totale e ultimi 30 giorni). Limite: su iPhone l'app sulla
+  Home ha storage separato da Safari, quindi il canale si perde se la tessera nasce dentro l'app installata.
 - Tessera in Apple/Google Wallet: in agenda (serve l'account sviluppatore Apple).
 
 ## Logica di dominio — Livelli e convenzioni

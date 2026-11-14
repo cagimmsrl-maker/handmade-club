@@ -5,6 +5,7 @@ export default function Clienti() {
   const [ricerca, setRicerca] = useState('')
   const [risultati, setRisultati] = useState([])
   const [errore, setErrore] = useState('')
+  const [origini, setOrigini] = useState([])
 
   function cerca() {
     api
@@ -14,6 +15,7 @@ export default function Clienti() {
   }
 
   useEffect(cerca, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { api.get('/admin/clienti/origini').then(setOrigini).catch(() => {}) }, [])
 
   async function bloccaTessera(id) {
     if (!window.confirm('Confermi il blocco della tessera di questo cliente?')) return
@@ -40,6 +42,16 @@ export default function Clienti() {
         </button>
       </div>
       {errore && <p className="messaggio-errore">{errore}</p>}
+
+      {origini.length > 0 && (
+        <p className="testo-secondario" style={{ margin: '4px 0 12px' }}>
+          <strong>Da dove arrivano le tessere</strong> (ultimi 30 giorni / totale):{' '}
+          {origini.map((o, i) => (
+            <span key={o.origine}>{i > 0 ? ' · ' : ''}{o.origine} <strong>{o.ultimi_30_giorni}</strong>/{o.totale}</span>
+          ))}
+          <br />Link con canale: <code>club.handmadecafe.it/installa?da=instagram</code> (o sacchetto, vetrina, nome-azienda…); senza parametro = banco.
+        </p>
+      )}
 
       <div style={{ overflowX: 'auto' }}>
         <table className="tabella-admin">

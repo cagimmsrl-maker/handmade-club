@@ -23,6 +23,23 @@ async function elenco(req, res, next) {
   }
 }
 
+// Tessere per canale di acquisizione (clienti.origine, migrazione 015):
+// totale e ultimi 30 giorni. NULL = "banco / non noto".
+async function origini(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT COALESCE(origine, 'banco') AS origine,
+              COUNT(*)::int AS totale,
+              COUNT(*) FILTER (WHERE created_at >= now() - interval '30 days')::int AS ultimi_30_giorni
+       FROM clienti WHERE stato <> 'cancellato'
+       GROUP BY 1 ORDER BY 2 DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function bloccaTessera(req, res, next) {
   try {
     const { rowCount } = await pool.query(
@@ -69,4 +86,4 @@ async function esportaMarketing(req, res, next) {
   }
 }
 
-module.exports = { elenco, bloccaTessera, esportaMarketing };
+module.exports = { elenco, bloccaTessera, esportaMarketing, origini };
