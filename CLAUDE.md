@@ -151,6 +151,10 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   localStorage e `/auth/registra` lo salva in `clienti.origine` (NULL = banco/non noto). Conteggio per canale
   in admin → Clienti (`GET /admin/clienti/origini`, totale e ultimi 30 giorni). Limite: su iPhone l'app sulla
   Home ha storage separato da Safari, quindi il canale si perde se la tessera nasce dentro l'app installata.
+- **Anteprima del link (Open Graph, 15/11/2026).** I tag `og:*`/`twitter:*` stanno in `client/index.html`
+  (statici: Nginx serve lo stesso file per ogni percorso e i crawler non eseguono JS), immagine
+  `client/public/og/tessera.jpg` (1200×630). Quando cambia l'offerta: aggiornare testo e immagine, deploy,
+  poi "Scrape Again" su developers.facebook.com/tools/debug per svuotare la cache di Facebook/WhatsApp.
 - Tessera in Apple/Google Wallet: in agenda (serve l'account sviluppatore Apple).
 
 ## Logica di dominio — Livelli e convenzioni

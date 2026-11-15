@@ -9,6 +9,26 @@
     <!-- Mai scurire la pagina col tema scuro del telefono: il QR e il codice a barre devono restare nero su bianco per la cassa. -->
     <meta name="color-scheme" content="only light" />
     <title>Handmade Club</title>
+    <!-- Anteprima del link su Facebook, WhatsApp, Instagram, Google (Open Graph).
+         I crawler non eseguono JavaScript e Nginx serve questo file per ogni
+         percorso, quindi i tag sono statici e uguali per tutta l'app: quando
+         cambia l'offerta vanno aggiornati qui (testo) e in public/og/tessera.jpg
+         (immagine 1200x630), poi deploy e "Scrape Again" nel debugger di Facebook. -->
+    <meta name="description" content="La tessera fedeltà gratuita di Handmade Café: -15% su tutto fino al 30 novembre, poi ogni settimana una nuova offerta per chi ha le notifiche attive. Fiano Romano, area di servizio Al Traguardo." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Handmade Club" />
+    <meta property="og:locale" content="it_IT" />
+    <meta property="og:url" content="https://club.handmadecafe.it/installa" />
+    <meta property="og:title" content="Handmade Club: -15% su tutto con la tessera gratuita" />
+    <meta property="og:description" content="Handmade Café, Fiano Romano (area di servizio Al Traguardo). Scarica la tessera in 1 minuto: -15% su tutto fino al 30 novembre, poi ogni settimana una nuova offerta per chi ha le notifiche attive." />
+    <meta property="og:image" content="https://club.handmadecafe.it/og/tessera.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Handmade Club: -15% su tutto con la tessera gratuita, Handmade Café Fiano Romano" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Handmade Club: -15% su tutto con la tessera gratuita" />
+    <meta name="twitter:description" content="Handmade Café, Fiano Romano. Scarica la tessera in 1 minuto." />
+    <meta name="twitter:image" content="https://club.handmadecafe.it/og/tessera.jpg" />
   </head>
   <body>
     <div id="root"></div>
