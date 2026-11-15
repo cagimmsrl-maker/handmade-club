@@ -9,29 +9,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Prepara chiave SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-
-      - name: Tessere, TGS, notifiche (sola lettura)
+      - name: Imposta offerta di benvenuto e invito notifiche nel .env (con backup) e riavvia
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
-          set +e
-          Q() { sudo -u postgres psql -d handmade_clienti -Atc "$1"; }
-          echo "--- ora ---"; date '+%d/%m %H:%M'
-          echo "--- totale attivi / consenso marketing ---"; Q "select count(*), count(*) filter (where consenso_marketing_il is not null and consenso_marketing_revocato_il is null) from clienti where stato='attivo'"
-          echo "--- iscritti per giorno dal 6/11 ---"; Q "select to_char(created_at at time zone 'Europe/Rome','DD/MM'), count(*) from clienti where created_at >= '2026-11-10 00:00+01' group by 1 order by min(created_at)"
-          echo "--- oggi per ora ---"; Q "select to_char(created_at at time zone 'Europe/Rome','HH24'), count(*) from clienti where created_at >= '2026-11-14 00:00+01' group by 1 order by 1"
-          echo "--- consenso marketing tra gli iscritti di oggi ---"; Q "select count(*) filter (where consenso_marketing_il is not null), count(*) from clienti where created_at >= '2026-11-14 00:00+01'"
-          echo "--- TGS ultimo uso s / esiti / attesa / errori ---"; Q "select round(extract(epoch from now()-ultimo_uso_il))::int from tgs_chiavi_api where attiva"; Q "select stato, count(*) from tgs_sincronizzazioni where sede_id=3 group by 1"; Q "select count(*) from clienti c join tessere t on t.cliente_id=c.id and t.stato='attiva' where c.stato='attivo' and not exists (select 1 from tgs_sincronizzazioni s where s.cliente_id=c.id and s.sede_id=3)"; Q "select count(*) from tgs_sincronizzazioni where stato='errore'"
-          echo "--- push: telefoni iscritti / clienti / notifiche inviate ---"; Q "select (select count(*) from push_iscrizioni), (select count(distinct cliente_id) from push_iscrizioni), (select count(*) from notifiche)"
-          echo "--- notifiche inviate ---"; Q "select to_char(created_at at time zone 'Europe/Rome','DD/MM HH24:MI'), titolo, destinatari, consegnate, fallite from notifiche order by id"
-          echo "--- promo pubblicate / caricamenti ---"; Q "select p.id, p.tipo, p.valido_al, count(pc.id) from promozioni p left join promozioni_clienti pc on pc.promozione_id=p.id where p.stato='pubblicata' group by p.id order by p.id"
-          exit 0
+          set -e
+          cd /root/handmade-club/server
+          cp .env ".env.bak-$(date +%Y%m%d-%H%M%S)"
+          python3 - <<'PY'
+          import re
+          p='.env'; t=open(p).read()
+          nuovi={
+            'OFFERTA_BENVENUTO_TITOLO': '-15% su tutto fino al 30 novembre',
+            'OFFERTA_BENVENUTO_TESTO': 'Lo sconto è già sulla tua tessera. Poi ogni settimana una nuova offerta, solo per chi ha la tessera e le notifiche attive: chi non le attiva se la perde.',
+            'INVITO_NOTIFICHE_ATTIVO': 'true',
+            'INVITO_NOTIFICHE_TITOLO': 'Attiva le notifiche',
+            'INVITO_NOTIFICHE_TESTO': 'Ogni settimana una nuova offerta riservata a chi ha le notifiche attive. Attivale adesso: chi non le ha se la perde.',
+          }
+          for k,v in nuovi.items():
+            riga=f'{k}={v}'
+            if re.search(rf'^{k}=', t, re.M): t=re.sub(rf'^{k}=.*$', riga, t, flags=re.M)
+            else: t=t.rstrip('\n')+'\n'+riga+'\n'
+          open(p,'w').write(t)
+          print('chiavi presenti:', [k for k in nuovi if re.search(rf'^{k}=', t, re.M)])
+          PY
+          cd /root/handmade-club && pm2 restart handmade-club --update-env >/dev/null && sleep 3
+          echo "--- offerta servita ---"; curl -s http://127.0.0.1:3002/api/auth/offerta; echo
+          echo "--- stato ---"; pm2 jlist | python3 -c "import json,sys; [print(p['name'],p['pm2_env']['status']) for p in json.load(sys.stdin) if p['name']=='handmade-club']"
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -s' < /tmp/cmd.sh
