@@ -17,32 +17,32 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Imposta offerta di benvenuto e invito notifiche nel .env (con backup) e riavvia
+      - name: Notifiche push - iscrizioni per giorno, tessere nuove e vecchie (sola lettura)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set -e
           cd /var/www/handmade-club/server
-          cp .env ".env.bak-$(date +%Y%m%d-%H%M%S)"
-          python3 - <<'PY'
-          import re
-          p='.env'; t=open(p).read()
-          nuovi={
-            'OFFERTA_BENVENUTO_TITOLO': '-15% su tutto fino al 30 novembre',
-            'OFFERTA_BENVENUTO_TESTO': 'Lo sconto è già sulla tua tessera. Poi ogni settimana una nuova offerta, solo per chi ha la tessera e le notifiche attive: chi non le attiva se la perde.',
-            'INVITO_NOTIFICHE_ATTIVO': 'true',
-            'INVITO_NOTIFICHE_TITOLO': 'Attiva le notifiche',
-            'INVITO_NOTIFICHE_TESTO': 'Ogni settimana una nuova offerta riservata a chi ha le notifiche attive. Attivale adesso: chi non le ha se la perde.',
-          }
-          for k,v in nuovi.items():
-            riga=f'{k}={v}'
-            if re.search(rf'^{k}=', t, re.M): t=re.sub(rf'^{k}=.*$', riga, t, flags=re.M)
-            else: t=t.rstrip('\n')+'\n'+riga+'\n'
-          open(p,'w').write(t)
-          print('chiavi presenti:', [k for k in nuovi if re.search(rf'^{k}=', t, re.M)])
-          PY
-          cd /var/www/handmade-club && pm2 restart handmade-club --update-env >/dev/null && sleep 3
-          echo "--- offerta servita ---"; curl -s http://127.0.0.1:3002/api/auth/offerta; echo
-          echo "--- stato ---"; pm2 jlist | python3 -c "import json,sys; [print(p['name'],p['pm2_env']['status']) for p in json.load(sys.stdin) if p['name']=='handmade-club']"
+          echo "--- env invito (solo presenza) ---"; grep -c '^INVITO_NOTIFICHE_ATTIVO=true' .env || true
+          echo "--- /cliente/me senza login (deve dare 401) ---"; curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3002/api/cliente/me
+          echo "--- versione frontend servita (InvitoNotifiche nel bundle) ---"; grep -l "invito-sfondo" /var/www/handmade-club/client/dist/assets/*.js | wc -l
+          sudo -u postgres psql -d handmade_clienti -At -F ' | ' <<'SQL'
+          \echo --- iscrizioni push per giorno (data iscrizione) ---
+          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','YYYY-MM-DD') g, COUNT(*) FROM push_iscrizioni GROUP BY 1 ORDER BY 1;
+          \echo --- iscrizioni dal 15/11 01:00: cliente nuovo (tessera creata dopo) o vecchio ---
+          SELECT CASE WHEN c.created_at >= '2026-11-15 01:00+01' THEN 'tessera nuova' ELSE 'tessera vecchia' END, COUNT(*)
+          FROM push_iscrizioni p JOIN clienti c ON c.id=p.cliente_id WHERE p.created_at >= '2026-11-15 01:00+01' GROUP BY 1;
+          \echo --- tessere nuove dal 15/11 01:00 e quante con push ---
+          SELECT COUNT(*), COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM push_iscrizioni p WHERE p.cliente_id=c.id)) FROM clienti c WHERE c.created_at >= '2026-11-15 01:00+01' AND c.stato='attivo';
+          \echo --- consensi marketing dati dal 15/11 01:00 (anche da vecchi) ---
+          SELECT COUNT(*) FROM clienti WHERE consenso_marketing_il >= '2026-11-15 01:00+01';
+          \echo --- totale telefoni iscritti / clienti ---
+          SELECT COUNT(*), COUNT(DISTINCT cliente_id) FROM push_iscrizioni;
+          \echo --- passaggi in cassa oggi (tessere usate) ---
+          SELECT COUNT(*) FROM scansioni WHERE created_at >= '2026-11-15 00:00+01';
+          \echo --- user agent delle tessere nuove senza push (ultimi 15, solo browser) ---
+          SELECT COALESCE(substring(s.ua from '(iPhone|Android [0-9]+|SamsungBrowser|Instagram|FBAN|CriOS|Chrome/[0-9]+|Safari)'),'?') , COUNT(*) FROM (
+            SELECT (SELECT user_agent FROM push_iscrizioni WHERE cliente_id=c.id LIMIT 1) ua FROM clienti c WHERE c.created_at >= '2026-11-15 01:00+01') s GROUP BY 1;
+          SQL
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -s' < /tmp/cmd.sh
