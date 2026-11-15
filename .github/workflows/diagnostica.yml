@@ -21,7 +21,7 @@ jobs:
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set -e
-          cd /root/handmade-club/server
+          cd /var/www/handmade-club/server
           cp .env ".env.bak-$(date +%Y%m%d-%H%M%S)"
           python3 - <<'PY'
           import re
@@ -40,7 +40,7 @@ jobs:
           open(p,'w').write(t)
           print('chiavi presenti:', [k for k in nuovi if re.search(rf'^{k}=', t, re.M)])
           PY
-          cd /root/handmade-club && pm2 restart handmade-club --update-env >/dev/null && sleep 3
+          cd /var/www/handmade-club && pm2 restart handmade-club --update-env >/dev/null && sleep 3
           echo "--- offerta servita ---"; curl -s http://127.0.0.1:3002/api/auth/offerta; echo
           echo "--- stato ---"; pm2 jlist | python3 -c "import json,sys; [print(p['name'],p['pm2_env']['status']) for p in json.load(sys.stdin) if p['name']=='handmade-club']"
           SCRIPT
