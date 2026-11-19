@@ -17,36 +17,23 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Tessere e notifiche di oggi (sola lettura)
+      - name: Tentativi di rientro di oggi (sola lettura, nessun dato personale)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set -e
           sudo -u postgres psql -d handmade_clienti -At -F ' | ' <<'SQL'
-          \echo === ORA ===
-          SELECT to_char(now() AT TIME ZONE 'Europe/Rome','DD/MM HH24:MI');
-          \echo === TESSERE NUOVE OGGI PER ORA ===
-          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','HH24'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-19 00:00+01' GROUP BY 1 ORDER BY 1;
-          \echo === TESSERE NUOVE ULTIMI GIORNI ===
-          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','DD/MM'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-12 00:00+01' GROUP BY 1 ORDER BY 1;
-          \echo === TOTALE ATTIVE | CON CONSENSO MARKETING ===
-          SELECT COUNT(*), COUNT(*) FILTER (WHERE consenso_marketing_il IS NOT NULL AND consenso_marketing_revocato_il IS NULL) FROM clienti WHERE stato='attivo';
-          \echo === NOTIFICHE ATTIVATE OGGI: TESSERA NUOVA (di oggi) / VECCHIA ===
-          SELECT CASE WHEN c.created_at >= '2026-11-19 00:00+01' THEN 'nuova' ELSE 'vecchia' END, COUNT(*) FROM push_iscrizioni p JOIN clienti c ON c.id=p.cliente_id WHERE p.created_at >= '2026-11-19 00:00+01' GROUP BY 1;
-          \echo === TESSERE DI OGGI CON NOTIFICHE / TOTALE ===
-          SELECT COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM push_iscrizioni p WHERE p.cliente_id=c.id)), COUNT(*) FROM clienti c WHERE c.created_at >= '2026-11-19 00:00+01';
-          \echo === TELEFONI ISCRITTI TOTALI | CLIENTI | RAGGIUNGIBILI (con consenso) ===
-          SELECT COUNT(*), COUNT(DISTINCT p.cliente_id), COUNT(DISTINCT p.cliente_id) FILTER (WHERE c.stato='attivo' AND c.consenso_marketing_il IS NOT NULL AND c.consenso_marketing_revocato_il IS NULL) FROM push_iscrizioni p JOIN clienti c ON c.id=p.cliente_id;
-          \echo === CONSENSI MARKETING DATI OGGI ===
-          SELECT COUNT(*) FROM clienti WHERE consenso_marketing_il >= '2026-11-19 00:00+01';
-          \echo === CANALE TESSERE DI OGGI ===
-          SELECT COALESCE(origine,'banco'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-19 00:00+01' GROUP BY 1;
-          \echo === PASSAGGI REGISTRATI OGGI (scansioni) ===
-          SELECT COUNT(*) FROM scansioni WHERE created_at >= '2026-11-19 00:00+01';
-          \echo === TGS: SINCRONIZZATE PER ESITO | IN ATTESA ===
-          SELECT stato, COUNT(*) FROM tgs_sincronizzazioni GROUP BY 1;
-          SELECT 'in attesa', COUNT(*) FROM clienti c JOIN tessere t ON t.cliente_id=c.id AND t.stato='attiva' WHERE c.stato='attivo' AND NOT EXISTS (SELECT 1 FROM tgs_sincronizzazioni s WHERE s.cliente_id=c.id);
-          SELECT 'ultima chiamata TGS', to_char(MAX(ultimo_uso_il) AT TIME ZONE 'Europe/Rome','HH24:MI:SS') FROM tgs_chiavi_api WHERE attiva;
+          \echo === CODICI CHIESTI OGGI: ora | usato | tentativi | scaduto ===
+          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','HH24:MI:SS'), usato, tentativi, (scade_il < now()) FROM otp_codes WHERE created_at >= '2026-11-19 00:00+01' ORDER BY created_at;
+          \echo === CLIENTI RIENTRATI COL CODICE OGGI (sessioni_valide_da di oggi): ora | verificato | creato il ===
+          SELECT to_char(sessioni_valide_da AT TIME ZONE 'Europe/Rome','HH24:MI:SS'), telefono_verificato, to_char(created_at AT TIME ZONE 'Europe/Rome','DD/MM') FROM clienti WHERE sessioni_valide_da >= '2026-11-19 00:00+01' ORDER BY 1;
+          \echo === FORMATO DEI NUMERI SALVATI ===
+          SELECT CASE WHEN telefono LIKE '+39%' THEN '+39...' WHEN telefono LIKE '39%' AND length(telefono) > 11 THEN '39...' WHEN telefono LIKE '+%' THEN 'altro +' ELSE 'senza prefisso' END, COUNT(*) FROM clienti WHERE stato='attivo' GROUP BY 1;
           SQL
+          echo "=== LOG: codici generati dall'admin e risposte al rientro (oggi) ==="
+          pm2 logs handmade-club --lines 4000 --nostream 2>/dev/null | grep -E "\[accesso\]|verifica-otp|Sessione non pi" | tail -12 | sed -E 's/[0-9]{6,}/######/g'
+          L=$(ls /var/log/nginx/*club*access*.log 2>/dev/null | head -1); [ -z "$L" ] && L=/var/log/nginx/access.log
+          echo "=== NGINX oggi: richieste di accesso (ora, percorso, codice) ==="
+          grep '19/Nov/2026' $L | grep -E 'POST /api/auth/(richiedi-otp|verifica-otp)|POST /api/admin/clienti/[0-9]+/codice-accesso' | awk '{print substr($4,14,8), $7, $9}' | sed -E 's#/clienti/[0-9]+/#/clienti/N/#' | tail -25
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -s' < /tmp/cmd.sh
