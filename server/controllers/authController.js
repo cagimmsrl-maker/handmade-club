@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const pool = require('../db/pool');
 const otpService = require('../services/otpService');
 const jwtService = require('../services/jwtService');
@@ -58,9 +59,58 @@ async function richiediOtp(req, res, next) {
   }
 }
 
+// Codice di rinnovo unico (20/11/2026, deciso dal titolare per rimediare alle
+// tessere scadute dopo 30 giorni): un solo codice numerico, uguale per tutti,
+// detto al banco. Sta nel .env (CODICE_RINNOVO, 6 cifre; vuoto = spento) con
+// scadenza facoltativa CODICE_RINNOVO_FINO_AL (AAAA-MM-GG, compreso).
+// Non dimostra che chi entra sia il titolare del numero: perciò NON segna il
+// numero come verificato e NON chiude le altre sessioni (sessioni_valide_da).
+// Rischio accettato dal titolare: chi sa codice e numero entra in quella tessera.
+// Freno: al massimo 3 rientri al giorno per numero (in memoria) + limite per IP.
+const MAX_RINNOVI_GIORNO = 3;
+const rinnoviPerNumero = new Map();
+function codiceRinnovoAttivo() {
+  const codice = (process.env.CODICE_RINNOVO || '').trim();
+  if (!/^\d{6}$/.test(codice)) return null;
+  const finoAl = (process.env.CODICE_RINNOVO_FINO_AL || '').trim();
+  if (finoAl) {
+    const fine = new Date(`${finoAl}T23:59:59`);
+    if (Number.isNaN(fine.getTime()) || Date.now() > fine.getTime()) return null;
+  }
+  return codice;
+}
+function stessoCodice(a, b) {
+  const x = Buffer.from(String(a)); const y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+async function entraConCodiceRinnovo(telefono, codice, res) {
+  const atteso = codiceRinnovoAttivo();
+  if (!atteso || !stessoCodice(codice, atteso)) return false;
+  const { rows } = await pool.query(
+    `SELECT c.id FROM clienti c JOIN tessere t ON t.cliente_id = c.id AND t.stato = 'attiva'
+      WHERE c.telefono = $1 AND c.stato = 'attivo'`,
+    [telefono]
+  );
+  if (rows.length !== 1) return false;
+  const oggi = new Date().toDateString();
+  const v = rinnoviPerNumero.get(telefono);
+  const n = v && v.giorno === oggi ? v.n : 0;
+  if (n >= MAX_RINNOVI_GIORNO) {
+    throw new otpService.ErroreApplicativo(429, 'Troppi accessi per questo numero oggi. Chiedi alla cassa.');
+  }
+  if (rinnoviPerNumero.size > 5000) rinnoviPerNumero.clear();
+  rinnoviPerNumero.set(telefono, { giorno: oggi, n: n + 1 });
+  const token = jwtService.creaTokenSessione('cliente', { clienteId: rows[0].id });
+  res.cookie(jwtService.NOME_COOKIE.cliente, token, opzioniCookie('cliente'));
+  console.log(`[rinnovo] rientro con codice di rinnovo, cliente ${rows[0].id}`);
+  res.json({ ok: true, nuovoCliente: false });
+  return true;
+}
+
 async function verificaOtp(req, res, next) {
   try {
     const telefono = await telefonoCanonico(normalizzaTelefono(req.body.telefono));
+    if (await entraConCodiceRinnovo(telefono, req.body.codice, res)) return;
     await otpService.verificaOtp(telefono, req.body.codice);
 
     const { rows } = await pool.query(

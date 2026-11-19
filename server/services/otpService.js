@@ -68,7 +68,7 @@ async function verificaOtp(telefono, codice) {
   const validi = rows.filter((r) => !r.usato && new Date(r.scade_il) >= new Date());
   if (!ultimo || validi.length === 0) {
     const scaduto = ultimo && !ultimo.usato;
-    throw new ErroreApplicativo(400, scaduto ? 'Codice scaduto. Richiedi un nuovo codice.' : 'Richiedi un nuovo codice.');
+    throw new ErroreApplicativo(400, scaduto ? 'Codice scaduto. Richiedi un nuovo codice.' : 'Codice non valido. Controlla il codice o chiedilo alla cassa.');
   }
   if (ultimo.tentativi >= MAX_TENTATIVI) {
     throw new ErroreApplicativo(429, 'Numero massimo di tentativi raggiunto. Richiedi un nuovo codice.');

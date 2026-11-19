@@ -133,6 +133,13 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   **Stesso codice dal banco**: nella schermata `/operatore` (PIN sede) "Il cliente non riesce a entrare nella
   tessera?" → numero → nome del cliente + codice (`POST /operatore/codice-accesso`, max 10 l'ora per sede, in
   memoria). Nell'app la schermata del codice dice "Non ti arriva l'SMS? Chiedi il codice alla cassa".
+  **Codice di rinnovo unico (20/11/2026, deciso dal titolare)** per rimediare in fretta alle tessere scadute: un
+  solo codice di 6 cifre uguale per tutti, nel `.env` (`CODICE_RINNOVO`, vuoto = spento; `CODICE_RINNOVO_FINO_AL`
+  AAAA-MM-GG facoltativo; si cambia con `pm2 restart --update-env`, senza deploy). `authController.entraConCodiceRinnovo`
+  lo prova prima degli OTP in `/auth/verifica-otp`: apre la sessione ma NON segna il numero verificato e NON tocca
+  `sessioni_valide_da` (non dimostra chi sei). Max 3 rientri al giorno per numero (in memoria) + limite per IP.
+  Rischio noto e accettato dal titolare: chi sa codice e numero entra in quella tessera. È una misura provvisoria:
+  quando non serve più, svuotare `CODICE_RINNOVO`.
   `authController.telefonoCanonico`: il numero scritto al login si riporta a quello salvato (ultime 10 cifre, se
   il cliente è uno solo), così "+39 333…" e "333…" trovano la stessa tessera. `authCliente` confronta
   `sessioni_valide_da` **al secondo**: al millisecondo respingeva subito chi era appena rientrato col codice.
