@@ -122,6 +122,10 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   **Sospensione (8/11/2026):** `VERIFICA_NUMERO_ATTIVA=false` nel `.env` (default true) nasconde la verifica
   nell'app (`/cliente/me` → `verificaDisponibile`) e `carica` non la richiede più; da rimettere a true
   quando gli SMS arrivano (riavvio `--update-env`, nessun deploy). Il login con codice resta.
+  **Codice di accesso dall'admin (19/11/2026)** per chi deve rientrare e non riceve l'SMS: admin → Clienti →
+  "Codice di accesso" (`POST /admin/clienti/:id/codice-accesso`, `otpService.codiceDaAdmin`): stessa tabella
+  `otp_codes`, valido 15 minuti, una volta; vale l'ultimo creato, quindi va generato DOPO che il cliente ha chiesto
+  il codice dall'app. Al primo uso il numero risulta verificato (garantisce l'admin). Nel log solo l'id cliente.
   L'accesso al pannello web Skebby ha una verifica in due passi sul cellulare/email dell'account; in
   emergenza `GET /API/v1.0/REST/dashboard` restituisce un link di accesso diretto (da mandare via SMS al
   titolare, mai nei log).

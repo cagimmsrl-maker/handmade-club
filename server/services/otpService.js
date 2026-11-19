@@ -80,4 +80,22 @@ async function verificaOtp(telefono, codice) {
   await pool.query('UPDATE otp_codes SET usato = true WHERE id = $1', [otp.id]);
 }
 
-module.exports = { richiediOtp, verificaOtp, ErroreApplicativo };
+// Codice di accesso generato dall'admin (19/11/2026), per quando l'SMS non
+// arriva (Skebby non consegna verso alcuni operatori). Stessa tabella e stessa
+// verifica dei codici SMS: vale l'ultimo creato per quel numero, quindi il
+// cliente deve inserirlo DOPO aver chiesto il codice dall'app (se dopo preme
+// "rinvia", il codice dell'admin viene superato). Validità più lunga perché
+// passa a voce o per WhatsApp. Il codice non viene mai salvato in chiaro.
+const VALIDITA_ADMIN_MINUTI = 15;
+async function codiceDaAdmin(telefono) {
+  const codice = generaCodice();
+  const codiceHash = await bcrypt.hash(codice, 10);
+  await pool.query(
+    `INSERT INTO otp_codes (telefono, codice_hash, scade_il)
+     VALUES ($1, $2, now() + interval '${VALIDITA_ADMIN_MINUTI} minutes')`,
+    [telefono, codiceHash]
+  );
+  return { codice, validoMinuti: VALIDITA_ADMIN_MINUTI };
+}
+
+module.exports = { richiediOtp, verificaOtp, codiceDaAdmin, ErroreApplicativo };

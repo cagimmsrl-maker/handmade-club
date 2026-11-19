@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const otpService = require('../services/otpService');
 
 async function elenco(req, res, next) {
   try {
@@ -35,6 +36,26 @@ async function origini(req, res, next) {
        GROUP BY 1 ORDER BY 2 DESC`
     );
     res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Codice di accesso per un cliente che deve rientrare nell'app e non riceve
+// l'SMS (19/11/2026). L'admin lo legge al cliente o glielo manda su WhatsApp;
+// il cliente lo inserisce nella schermata "Ho già la tessera" al posto di
+// quello SMS. Chi lo genera garantisce che il numero è del cliente: al primo
+// uso il numero risulta verificato, come con l'SMS. Nel log solo il cliente.
+async function codiceAccesso(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, telefono FROM clienti WHERE id = $1 AND stato = 'attivo'`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ errore: 'Cliente non trovato o non attivo.' });
+    const esito = await otpService.codiceDaAdmin(rows[0].telefono);
+    console.log(`[accesso] codice di accesso generato dall'admin ${req.adminId ?? '?'} per il cliente ${rows[0].id}`);
+    res.json(esito);
   } catch (err) {
     next(err);
   }
@@ -86,4 +107,4 @@ async function esportaMarketing(req, res, next) {
   }
 }
 
-module.exports = { elenco, bloccaTessera, esportaMarketing, origini };
+module.exports = { elenco, bloccaTessera, esportaMarketing, origini, codiceAccesso };

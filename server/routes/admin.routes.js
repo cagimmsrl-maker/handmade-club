@@ -85,5 +85,6 @@ router.post('/notifiche', validate(notificaSchema), pushController.inviaAdmin);
 router.get('/tgs/sincronizzazione', tgsController.riepilogoAdmin);
 router.post('/tgs/sincronizzazione/:clienteId/riprova', tgsController.riprovaAdmin);
 router.post('/clienti/:id/blocca-tessera', adminClientiController.bloccaTessera);
+router.post('/clienti/:id/codice-accesso', adminClientiController.codiceAccesso);
 
 module.exports = router;

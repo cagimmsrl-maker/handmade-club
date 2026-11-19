@@ -27,6 +27,25 @@ export default function Clienti() {
     }
   }
 
+  // Codice di accesso quando l'SMS non arriva (19/11/2026). Il cliente apre
+  // l'app, tocca "Ho già la tessera", mette il numero e chiede il codice;
+  // poi l'admin genera questo e glielo dice: va inserito al posto dell'SMS.
+  async function codiceAccesso(c) {
+    const ok = window.confirm(
+      `Codice di accesso per ${c.nome} ${c.cognome || ''} (${c.telefono}).\n\n` +
+      'Prima il cliente deve aprire l\'app, toccare "Ho già la tessera", inserire il numero e chiedere il codice. ' +
+      'Solo dopo genera questo codice e diglielo: lo inserisce al posto di quello SMS.\n\n' +
+      'Generare adesso?'
+    )
+    if (!ok) return
+    try {
+      const { codice, validoMinuti } = await api.post(`/admin/clienti/${c.id}/codice-accesso`)
+      window.alert(`Codice per ${c.nome}: ${codice}\n\nValido ${validoMinuti} minuti, una sola volta. Se il cliente preme "rinvia" nell'app, va generato di nuovo.`)
+    } catch (err) {
+      setErrore(err.message)
+    }
+  }
+
   return (
     <div className="card">
       <h2>Clienti</h2>
@@ -78,6 +97,9 @@ export default function Clienti() {
                   ))}
                 </td>
                 <td>
+                  {c.tessera_stato === 'attiva' && (
+                    <button className="link-testo" onClick={() => codiceAccesso(c)} style={{ display: 'block', marginBottom: 4 }}>Codice di accesso</button>
+                  )}
                   {c.tessera_stato === 'attiva' && (
                     <button className="link-testo" onClick={() => bloccaTessera(c.id)}>Blocca tessera</button>
                   )}
