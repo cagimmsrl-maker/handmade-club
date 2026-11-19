@@ -1,5 +1,5 @@
 const MAX_AGE_MS = {
-  cliente: 30 * 24 * 60 * 60 * 1000,
+  cliente: 400 * 24 * 60 * 60 * 1000, // come DURATA_SESSIONE.cliente in jwtService
   operatore: 24 * 60 * 60 * 1000,
   admin: 12 * 60 * 60 * 1000,
 };

@@ -33,14 +33,13 @@ export default function Clienti() {
   async function codiceAccesso(c) {
     const ok = window.confirm(
       `Codice di accesso per ${c.nome} ${c.cognome || ''} (${c.telefono}).\n\n` +
-      'Prima il cliente deve aprire l\'app, toccare "Ho già la tessera", inserire il numero e chiedere il codice. ' +
-      'Solo dopo genera questo codice e diglielo: lo inserisce al posto di quello SMS.\n\n' +
+      'Il cliente apre l\'app, tocca "Ho già la tessera", scrive il suo numero, tocca "Ho già un codice dalla cassa" e inserisce il codice.\n\n' +
       'Generare adesso?'
     )
     if (!ok) return
     try {
       const { codice, validoMinuti } = await api.post(`/admin/clienti/${c.id}/codice-accesso`)
-      window.alert(`Codice per ${c.nome}: ${codice}\n\nValido ${validoMinuti} minuti, una sola volta. Se il cliente preme "rinvia" nell'app, va generato di nuovo.`)
+      window.alert(`Codice per ${c.nome}: ${codice}\n\nValido ${validoMinuti} minuti, una sola volta.`)
     } catch (err) {
       setErrore(err.message)
     }

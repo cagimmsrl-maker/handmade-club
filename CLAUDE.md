@@ -58,10 +58,11 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
      le reti mobili usano CGNAT — il limite per IP ferma solo gli abusi automatici). Il tetto vero per
      gli OTP è **per numero** (otpService: max richieste per numero, 3 tentativi per codice).
    - OTP a 6 cifre, validità 5 minuti, monouso, max 3 tentativi di verifica
-   - Sessioni con JWT httpOnly + secure, scadenza 30 giorni (i clienti non devono riloggarsi ogni volta).
-     **Rinnovo automatico (19/11/2026):** `authCliente` riemette il cookie (altri 30 giorni) se il token ha più di
-     un giorno e il cliente è attivo: scade solo chi non apre l'app per 30 giorni. Prima scadeva 30 giorni dopo la
-     registrazione anche per chi la usava ogni giorno (scoperto quando le tessere di staff del 18-20/10 sono scadute).
+   - Sessioni con JWT httpOnly + secure. **La tessera del cliente è perenne (19/11/2026, deciso dal titolare):**
+     token e cookie durano 400 giorni (il massimo che i browser concedono a un cookie) e `authCliente` li riemette
+     a ogni uso se hanno più di un giorno: scade solo chi non apre l'app per 13 mesi. Fino al 19/11 duravano 30
+     giorni dalla registrazione senza rinnovo, e le tessere di staff del 18-20/10 sono scadute. Resta revocabile:
+     blocco tessera, cancellazione account, `sessioni_valide_da`. Operatore 24 h e admin 12 h restano invariati.
    - Input validation su ogni endpoint (mai fidarsi del client)
    - Nessun dato sensibile nei log
 5. **Ruoli separati.** Tre superfici distinte:
@@ -124,8 +125,11 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   quando gli SMS arrivano (riavvio `--update-env`, nessun deploy). Il login con codice resta.
   **Codice di accesso dall'admin (19/11/2026)** per chi deve rientrare e non riceve l'SMS: admin → Clienti →
   "Codice di accesso" (`POST /admin/clienti/:id/codice-accesso`, `otpService.codiceDaAdmin`): stessa tabella
-  `otp_codes`, valido 15 minuti, una volta; vale l'ultimo creato, quindi va generato DOPO che il cliente ha chiesto
-  il codice dall'app. Al primo uso il numero risulta verificato (garantisce l'admin). Nel log solo l'id cliente.
+  `otp_codes`, valido 30 minuti, una volta. `verificaOtp` accetta QUALSIASI codice non usato e non scaduto del
+  numero (ultimi 5), quindi l'ordine non conta: resta buono anche se il cliente chiede un SMS prima o dopo (il
+  primo tentativo del titolare è fallito proprio per l'ordine). Nell'app, dopo il numero, "Ho già un codice dalla
+  cassa" porta alla schermata del codice senza far partire l'SMS. Al primo uso il numero risulta verificato
+  (garantisce chi genera il codice). Nel log solo l'id cliente.
   **Stesso codice dal banco**: nella schermata `/operatore` (PIN sede) "Il cliente non riesce a entrare nella
   tessera?" → numero → nome del cliente + codice (`POST /operatore/codice-accesso`, max 10 l'ora per sede, in
   memoria). Nell'app la schermata del codice dice "Non ti arriva l'SMS? Chiedi il codice alla cassa".

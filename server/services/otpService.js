@@ -53,40 +53,46 @@ async function richiediOtp(telefono) {
   await smsService.inviaOtp(telefono, codice);
 }
 
+// Vale QUALSIASI codice non usato e non scaduto di quel numero (gli ultimi 5),
+// non solo l'ultimo creato (19/11/2026): così il codice dato dalla cassa o
+// dall'admin resta buono anche se il cliente, prima o dopo, preme "Invia
+// codice" nell'app e ne nasce un altro via SMS. Il freno ai tentativi resta
+// sull'ultimo codice creato; al primo codice giusto si bruciano tutti.
 async function verificaOtp(telefono, codice) {
   const { rows } = await pool.query(
     `SELECT id, codice_hash, scade_il, tentativi, usato FROM otp_codes
-     WHERE telefono = $1 ORDER BY created_at DESC LIMIT 1`,
+     WHERE telefono = $1 ORDER BY created_at DESC LIMIT 5`,
     [telefono]
   );
-  const otp = rows[0];
-  if (!otp || otp.usato) {
-    throw new ErroreApplicativo(400, 'Richiedi un nuovo codice.');
+  const ultimo = rows[0];
+  const validi = rows.filter((r) => !r.usato && new Date(r.scade_il) >= new Date());
+  if (!ultimo || validi.length === 0) {
+    const scaduto = ultimo && !ultimo.usato;
+    throw new ErroreApplicativo(400, scaduto ? 'Codice scaduto. Richiedi un nuovo codice.' : 'Richiedi un nuovo codice.');
   }
-  if (new Date(otp.scade_il) < new Date()) {
-    throw new ErroreApplicativo(400, 'Codice scaduto. Richiedi un nuovo codice.');
-  }
-  if (otp.tentativi >= MAX_TENTATIVI) {
+  if (ultimo.tentativi >= MAX_TENTATIVI) {
     throw new ErroreApplicativo(429, 'Numero massimo di tentativi raggiunto. Richiedi un nuovo codice.');
   }
 
-  const valido = await bcrypt.compare(codice, otp.codice_hash);
-  if (!valido) {
-    await pool.query('UPDATE otp_codes SET tentativi = tentativi + 1 WHERE id = $1', [otp.id]);
-    const tentativiRimasti = MAX_TENTATIVI - (otp.tentativi + 1);
+  let trovato = false;
+  for (const r of validi) {
+    if (await bcrypt.compare(codice, r.codice_hash)) { trovato = true; break; }
+  }
+  if (!trovato) {
+    await pool.query('UPDATE otp_codes SET tentativi = tentativi + 1 WHERE id = $1', [ultimo.id]);
+    const tentativiRimasti = MAX_TENTATIVI - (ultimo.tentativi + 1);
     throw new ErroreApplicativo(400, `Codice errato. Tentativi rimasti: ${Math.max(tentativiRimasti, 0)}.`);
   }
 
-  await pool.query('UPDATE otp_codes SET usato = true WHERE id = $1', [otp.id]);
+  await pool.query('UPDATE otp_codes SET usato = true WHERE id = ANY($1::int[])', [validi.map((r) => r.id)]);
 }
 
 // Codice di accesso generato dall'admin (19/11/2026), per quando l'SMS non
 // arriva (Skebby non consegna verso alcuni operatori). Stessa tabella e stessa
-// verifica dei codici SMS: vale l'ultimo creato per quel numero, quindi il
-// cliente deve inserirlo DOPO aver chiesto il codice dall'app (se dopo preme
-// "rinvia", il codice dell'admin viene superato). Validità più lunga perché
-// passa a voce o per WhatsApp. Il codice non viene mai salvato in chiaro.
-const VALIDITA_ADMIN_MINUTI = 15;
+// verifica dei codici SMS; resta valido anche se il cliente chiede un altro
+// codice dall'app (vedi verificaOtp). Validità più lunga perché passa a voce
+// o per WhatsApp. Il codice non viene mai salvato in chiaro.
+const VALIDITA_ADMIN_MINUTI = 30;
 async function codiceDaAdmin(telefono) {
   const codice = generaCodice();
   const codiceHash = await bcrypt.hash(codice, 10);

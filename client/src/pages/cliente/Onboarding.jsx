@@ -73,12 +73,23 @@ export default function Onboarding({ onCompletato }) {
     setCaricamento(true)
     try {
       await api.post('/auth/richiedi-otp', { telefono })
+      setSenzaSms(false)
       setStep(STEP_OTP)
     } catch (err) {
       setErrore(err.message)
     } finally {
       setCaricamento(false)
     }
+  }
+
+  // "Ho già un codice dalla cassa": si va alla schermata del codice senza
+  // far partire un SMS (che spesso non arriva e costa). Serve solo il numero.
+  const [senzaSms, setSenzaSms] = useState(false)
+  function hoGiaIlCodice() {
+    setErrore('')
+    if (telefono.replace(/\D/g, '').length < 9) { setErrore('Scrivi prima il tuo numero di telefono.'); return }
+    setSenzaSms(true)
+    setStep(STEP_OTP)
   }
 
   async function verificaCodice(e) {
@@ -200,6 +211,9 @@ export default function Onboarding({ onCompletato }) {
           <button className="btn btn-primario" disabled={caricamento} type="submit">
             {caricamento ? 'Invio in corso...' : 'Invia codice'}
           </button>
+          <button type="button" className="btn btn-secondario" style={{ marginTop: 10 }} onClick={hoGiaIlCodice}>
+            Ho già un codice dalla cassa
+          </button>
           <button type="button" className="link-testo" style={{ marginTop: 14 }} onClick={() => { setModo(MODO_REGISTRA); setErrore('') }}>
             Non ho ancora la tessera
           </button>
@@ -209,8 +223,14 @@ export default function Onboarding({ onCompletato }) {
       {modo === MODO_ACCEDI && step === STEP_OTP && (
         <form className="card" onSubmit={verificaCodice}>
           <h2>Inserisci il codice</h2>
-          <p className="testo-secondario">Abbiamo inviato un codice a 6 cifre a {telefono}.</p>
-          <p className="avviso-codice"><strong>Non ti arriva l'SMS?</strong> Chiedi il codice alla cassa di Handmade Café: te lo danno subito.</p>
+          {senzaSms ? (
+            <p className="testo-secondario">Scrivi il codice a 6 cifre che ti hanno dato alla cassa per il numero {telefono}.</p>
+          ) : (
+            <>
+              <p className="testo-secondario">Abbiamo inviato un codice a 6 cifre a {telefono}.</p>
+              <p className="avviso-codice"><strong>Non ti arriva l'SMS?</strong> Chiedi il codice alla cassa di Handmade Café: te lo danno subito.</p>
+            </>
+          )}
           <div className="campo">
             <label htmlFor="codice">Codice</label>
             <input id="codice" type="text" inputMode="numeric" maxLength={6} placeholder="123456" value={codice} onChange={(e) => setCodice(e.target.value.replace(/\D/g, ''))} required autoComplete="one-time-code" />

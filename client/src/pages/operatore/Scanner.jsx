@@ -119,8 +119,8 @@ function CodiceAccesso() {
     <form className="card" onSubmit={genera} style={{ marginTop: 18 }}>
       <h2>Codice di accesso</h2>
       <p className="testo-secondario">
-        Sul suo telefono il cliente tocca <strong>"Ho già la tessera"</strong>, scrive il numero e preme <strong>Invia codice</strong>.
-        Poi tu scrivi qui il suo numero e gli leggi il codice.
+        Scrivi qui il numero del cliente e leggigli il codice. Sul suo telefono il cliente tocca <strong>"Ho già la tessera"</strong>,
+        scrive il numero, tocca <strong>"Ho già un codice dalla cassa"</strong> e lo inserisce.
       </p>
       <div className="campo">
         <label htmlFor="tel-accesso">Numero del cliente</label>
@@ -132,7 +132,7 @@ function CodiceAccesso() {
         <div style={{ textAlign: 'center', margin: '8px 0 14px' }}>
           <p style={{ margin: 0 }}>Tessera di <strong>{esito.nome} {esito.cognome}</strong>: controlla che sia lui.</p>
           <p style={{ fontSize: '2.6rem', fontWeight: 800, letterSpacing: '0.18em', margin: '6px 0' }}>{esito.codice}</p>
-          <p className="testo-secondario" style={{ margin: 0 }}>Vale {esito.validoMinuti} minuti, una volta sola. Se il cliente preme di nuovo "Invia codice", generane un altro.</p>
+          <p className="testo-secondario" style={{ margin: 0 }}>Vale {esito.validoMinuti} minuti, una volta sola.</p>
         </div>
       )}
       <button className="btn btn-primario" type="submit" disabled={lavoro}>{lavoro ? 'Un attimo…' : esito ? 'Genera un altro codice' : 'Genera il codice'}</button>

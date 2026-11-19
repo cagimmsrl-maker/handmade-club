@@ -2,12 +2,11 @@ const pool = require('../db/pool');
 const { NOME_COOKIE, verificaTokenSessione, creaTokenSessione } = require('../services/jwtService');
 const { opzioniCookie } = require('../services/cookieOptions');
 
-// Rinnovo automatico (19/11/2026): la sessione dura 30 giorni, ma da ora si
-// rinnova a ogni uso se il token ha più di un giorno. Prima scadeva 30 giorni
-// dopo la registrazione anche per chi apriva l'app ogni giorno: il cliente si
-// ritrovava su "Crea la tua tessera" e per rientrare serviva il codice SMS
-// (che verso alcuni operatori non arriva). Chi non apre l'app per 30 giorni
-// continua a scadere, come prima.
+// Rinnovo automatico (19/11/2026): la sessione dura 400 giorni e si rinnova a
+// ogni uso se il token ha più di un giorno, quindi per chi apre l'app la
+// tessera è perenne. Prima scadeva 30 giorni dopo la registrazione anche per
+// chi la usava ogni giorno: il cliente si ritrovava su "Crea la tua tessera" e
+// per rientrare serviva il codice SMS (che verso alcuni operatori non arriva).
 const RINNOVA_DOPO_SECONDI = 24 * 60 * 60;
 
 // Oltre alla firma del JWT, controlla clienti.sessioni_valide_da: quando il

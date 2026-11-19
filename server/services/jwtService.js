@@ -1,7 +1,12 @@
 const jwt = require('jsonwebtoken');
 
+// Cliente: tessera "perenne" (19/11/2026, richiesta del titolare). 400 giorni è
+// il massimo che i browser concedono a un cookie (Chrome lo tronca lì); con il
+// rinnovo a ogni uso (authCliente) la tessera non scade mai per chi apre l'app
+// almeno una volta in 13 mesi. Resta revocabile: blocco tessera, cancellazione
+// account, `sessioni_valide_da` alla verifica del numero.
 const DURATA_SESSIONE = {
-  cliente: '30d',
+  cliente: '400d',
   operatore: '24h',
   admin: '12h',
 };
