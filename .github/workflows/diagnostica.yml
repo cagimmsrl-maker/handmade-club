@@ -17,24 +17,39 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Sessioni clienti - scadenze e 401 (sola lettura)
+      - name: Prova SMS Skebby in Alta qualita (TI) verso il numero del titolare
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set -e
-          echo "=== NGINX /api/cliente/me per giorno e codice (ultimi 4 giorni) ==="
-          L=$(ls /var/log/nginx/*club*access*.log 2>/dev/null | head -1); [ -z "$L" ] && L=/var/log/nginx/access.log
-          echo "log: $(basename $L)"
-          for f in $L $L.1; do [ -f $f ] && cat $f; done | grep ' /api/cliente/me' | awk '{d=substr($4,2,11); print d, $9}' | sort | uniq -c | tail -12
-          sudo -u postgres psql -d handmade_clienti -At -F ' | ' <<'SQL'
-          \echo === TESSERE PER DATA DI CREAZIONE (fino al 28/10) - sessioni scadute se non rinnovate ===
-          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','DD/MM'), COUNT(*) FROM clienti WHERE created_at < '2026-10-29 00:00+01' GROUP BY 1 ORDER BY 1;
-          \echo === CLIENTI CON sessioni_valide_da IMPOSTATO ultimi 3 giorni ===
-          SELECT COUNT(*) FROM clienti WHERE sessioni_valide_da >= now() - interval '3 days';
-          \echo === TESSERE CHE SCADONO PER DATA (30 gg dalla creazione o ultimo login) prossimi 10 giorni ===
-          SELECT to_char((created_at + interval '30 days') AT TIME ZONE 'Europe/Rome','DD/MM'), COUNT(*) FROM clienti WHERE stato='attivo' AND created_at + interval '30 days' < now() + interval '10 days' GROUP BY 1 ORDER BY 1;
-          SQL
-          echo "=== pm2 handmade-club: riavvii e uptime ==="
-          pm2 jlist | python3 -c "import json,sys,time; [print(p['name'],'restarts',p['pm2_env']['restart_time'],'uptime_h',round((time.time()*1000-p['pm2_env']['pm_uptime'])/3600000,1)) for p in json.load(sys.stdin) if p['name']=='handmade-club']"
+          cd /var/www/handmade-club/server
+          cat > /tmp/prova-ti.js <<'JS'
+          require('dotenv').config();
+          const B = 'https://api.skebby.it/API/v1.0/REST';
+          const NUM = '393356483122';
+          const maschera = (n) => n.slice(0, 5) + '...' + n.slice(-3);
+          (async () => {
+            const l = await fetch(`${B}/login?username=${encodeURIComponent(process.env.SKEBBY_USER)}&password=${encodeURIComponent(process.env.SKEBBY_PASSWORD)}`);
+            if (!l.ok) { console.log('login HTTP', l.status); return; }
+            const [user_key, Session_key] = (await l.text()).trim().split(';');
+            const h = { 'Content-Type': 'application/json', user_key, Session_key };
+            const st = await (await fetch(`${B}/status`, { headers: h })).json().catch(() => ({}));
+            console.log('CREDITO euro:', st.money, '| SMS per tipo:', JSON.stringify((st.sms || []).map((s) => ({ tipo: s.type, quanti: s.quantity }))));
+            for (const tipo of ['TI']) {
+              const r = await fetch(`${B}/sms`, { method: 'POST', headers: h, body: JSON.stringify({ message_type: tipo, message: 'Handmade Club: prova di consegna SMS in alta qualita. Se la leggi, funziona.', recipient: [NUM], returnCredits: true }) });
+              const d = await r.json().catch(() => ({}));
+              console.log(`INVIO ${tipo} a ${maschera(NUM)}: HTTP ${r.status} result=${d.result} order=${d.order_id} sms=${d.total_sent} credito_residuo=${d.remaining_credits}`);
+              if (d.result !== 'OK') { console.log('dettaglio:', JSON.stringify(d).slice(0, 300)); continue; }
+              for (let i = 0; i < 9; i++) {
+                await new Promise((r2) => setTimeout(r2, 10000));
+                const s = await (await fetch(`${B}/sms/${d.order_id}`, { headers: h })).json().catch(() => ({}));
+                const stato = (s.recipients || []).map((x) => x.status).join(',');
+                console.log(`  dopo ${(i + 1) * 10}s: ${stato || JSON.stringify(s).slice(0, 120)}`);
+                if (/DLVRD|ERROR|TIMEOUT|FAILED|KO/.test(stato)) break;
+              }
+            }
+          })().catch((e) => console.log('ERRORE', e.message));
+          JS
+          cp /tmp/prova-ti.js ./_prova-ti.js && node ./_prova-ti.js; rm -f ./_prova-ti.js /tmp/prova-ti.js
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -s' < /tmp/cmd.sh
