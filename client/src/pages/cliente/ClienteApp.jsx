@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../api.js'
+import { ricordaNumero, dimenticaNumero } from '../../lib/numeroRicordato.js'
 import Onboarding from './Onboarding.jsx'
 import Home from './Home.jsx'
 import Profilo from './Profilo.jsx'
@@ -14,7 +15,7 @@ export default function ClienteApp() {
   function verificaSessione() {
     api
       .get('/cliente/me')
-      .then(() => setStato('autenticato'))
+      .then((dati) => { ricordaNumero(dati?.telefono); setStato('autenticato') })
       .catch(() => setStato('onboarding'))
   }
 
@@ -25,7 +26,7 @@ export default function ClienteApp() {
   }
 
   if (stato === 'onboarding') {
-    return <Onboarding onCompletato={() => { setStato('autenticato'); navigate('/') }} />
+    return <Onboarding onCompletato={(telefono) => { ricordaNumero(telefono); setStato('autenticato'); navigate('/') }} />
   }
 
   return (
@@ -35,7 +36,7 @@ export default function ClienteApp() {
         <Route path="/promozioni" element={<Promozioni />} />
         <Route
           path="/profilo"
-          element={<Profilo onAccountCancellato={() => { setStato('onboarding'); navigate('/') }} />}
+          element={<Profilo onAccountCancellato={() => { dimenticaNumero(); setStato('onboarding'); navigate('/') }} />}
         />
       </Routes>
       <nav className="tab-bar">

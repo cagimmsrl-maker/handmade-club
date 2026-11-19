@@ -140,6 +140,10 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   `sessioni_valide_da` (non dimostra chi sei). Max 3 rientri al giorno per numero (in memoria) + limite per IP.
   Rischio noto e accettato dal titolare: chi sa codice e numero entra in quella tessera. È una misura provvisoria:
   quando non serve più, svuotare `CODICE_RINNOVO`.
+  **Numero ricordato (20/11/2026)**: `lib/numeroRicordato.js` salva in localStorage il numero della tessera a ogni
+  `/cliente/me` riuscito e a ogni ingresso; se la sessione cade, `Onboarding` parte da "Bentornato! Rientra nella tua
+  tessera" con il numero già scritto invece che da "Crea la tua tessera". Si cancella con la cancellazione dell'account.
+  Vale solo da quando il telefono ha aperto l'app con questa versione (e, su iPhone, Safari e app sulla Home sono separati).
   `authController.telefonoCanonico`: il numero scritto al login si riporta a quello salvato (ultime 10 cifre, se
   il cliente è uno solo), così "+39 333…" e "333…" trovano la stessa tessera. `authCliente` confronta
   `sessioni_valide_da` **al secondo**: al millisecondo respingeva subito chi era appena rientrato col codice.

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api.js'
 import { origineRicordata, dimenticaOrigine } from '../../lib/origine.js'
+import { numeroRicordato } from '../../lib/numeroRicordato.js'
 import OffertaBenvenuto from '../../components/OffertaBenvenuto.jsx'
 
 // Ingresso: "entri subito, verifichi dopo". La tessera si crea con nome e
@@ -14,9 +15,12 @@ const STEP_OTP = 'otp'
 const STEP_PROFILO = 'profilo'
 
 export default function Onboarding({ onCompletato }) {
-  const [modo, setModo] = useState(MODO_REGISTRA)
+  // Chi ha già avuto la tessera su questo telefono (numero ricordato) parte
+  // dall'accesso con il numero già scritto, non da "Crea la tua tessera".
+  const [ricordato] = useState(numeroRicordato)
+  const [modo, setModo] = useState(ricordato ? MODO_ACCEDI : MODO_REGISTRA)
   const [step, setStep] = useState(null) // per il modo "accedi": null | otp | profilo
-  const [telefono, setTelefono] = useState('')
+  const [telefono, setTelefono] = useState(ricordato)
   const [codice, setCodice] = useState('')
   const [tokenRegistrazione, setTokenRegistrazione] = useState(null)
   const [errore, setErrore] = useState('')
@@ -52,7 +56,7 @@ export default function Onboarding({ onCompletato }) {
     try {
       await api.post('/auth/registra', { telefono, ...profiloPayload() })
       dimenticaOrigine()
-      onCompletato()
+      onCompletato(telefono)
     } catch (err) {
       if (err.status === 409) {
         setErrore('Questo numero ha già una tessera: tocca "Ho già la tessera" qui sotto per accedere.')
@@ -102,7 +106,7 @@ export default function Onboarding({ onCompletato }) {
         setTokenRegistrazione(dati.tokenRegistrazione)
         setStep(STEP_PROFILO)
       } else {
-        onCompletato()
+        onCompletato(telefono)
       }
     } catch (err) {
       setErrore(err.message)
@@ -121,7 +125,7 @@ export default function Onboarding({ onCompletato }) {
     setCaricamento(true)
     try {
       await api.post('/auth/completa-profilo', { tokenRegistrazione, ...profiloPayload() })
-      onCompletato()
+      onCompletato(telefono)
     } catch (err) {
       setErrore(err.message)
     } finally {
@@ -201,7 +205,7 @@ export default function Onboarding({ onCompletato }) {
 
       {modo === MODO_ACCEDI && step === null && (
         <form className="card" onSubmit={inviaTelefono}>
-          <h2>Accedi alla tua tessera</h2>
+          <h2>{ricordato ? 'Bentornato! Rientra nella tua tessera' : 'Accedi alla tua tessera'}</h2>
           <p className="testo-secondario">Ti inviamo un codice via SMS al numero con cui ti sei registrato. Se l'SMS non arriva, il codice te lo dà la cassa.</p>
           <div className="campo">
             <label htmlFor="telefono">Numero di telefono</label>
