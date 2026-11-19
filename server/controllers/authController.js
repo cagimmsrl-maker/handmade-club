@@ -31,9 +31,26 @@ function normalizzaTelefono(telefono) {
   return telefono.trim().replace(/[\s-]/g, '');
 }
 
+// Il numero come è salvato sulla tessera. Chi si è registrato con
+// "3331234567" e rientra scrivendo "+39 333 1234567" (o il contrario) deve
+// ritrovare la sua tessera: si confrontano le ultime 10 cifre e, se c'è un
+// solo cliente, si usa il suo numero così com'è salvato. Vale per il codice
+// SMS e per il codice dato dal banco (19/11/2026).
+async function telefonoCanonico(telefono) {
+  const cifre = telefono.replace(/\D/g, '');
+  if (cifre.length < 9) return telefono;
+  const { rows } = await pool.query(
+    `SELECT telefono FROM clienti
+     WHERE stato != 'cancellato' AND right(regexp_replace(telefono, '\\D', '', 'g'), 10) = $1
+     LIMIT 2`,
+    [cifre.slice(-10)]
+  );
+  return rows.length === 1 ? rows[0].telefono : telefono;
+}
+
 async function richiediOtp(req, res, next) {
   try {
-    const telefono = normalizzaTelefono(req.body.telefono);
+    const telefono = await telefonoCanonico(normalizzaTelefono(req.body.telefono));
     await otpService.richiediOtp(telefono);
     res.json({ ok: true });
   } catch (err) {
@@ -43,7 +60,7 @@ async function richiediOtp(req, res, next) {
 
 async function verificaOtp(req, res, next) {
   try {
-    const telefono = normalizzaTelefono(req.body.telefono);
+    const telefono = await telefonoCanonico(normalizzaTelefono(req.body.telefono));
     await otpService.verificaOtp(telefono, req.body.codice);
 
     const { rows } = await pool.query(

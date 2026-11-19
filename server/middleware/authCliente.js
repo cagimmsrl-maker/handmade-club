@@ -25,7 +25,11 @@ module.exports = async function authCliente(req, res, next) {
   try {
     const { rows } = await pool.query('SELECT sessioni_valide_da, stato FROM clienti WHERE id = $1', [payload.clienteId]);
     const da = rows[0]?.sessioni_valide_da;
-    if (da && payload.iat * 1000 < new Date(da).getTime()) {
+    // Confronto al secondo: `iat` del JWT è in secondi interi, `sessioni_valide_da`
+    // ha i millisecondi. Confrontando al millisecondo, il token emesso nello stesso
+    // istante della verifica (quello di chi è appena rientrato col codice) risultava
+    // "più vecchio" e veniva respinto subito (corretto il 19/11/2026).
+    if (da && payload.iat < Math.floor(new Date(da).getTime() / 1000)) {
       res.clearCookie(NOME_COOKIE.cliente, { path: '/' });
       return res.status(401).json({ errore: 'Sessione non più valida. Accedi di nuovo con il codice SMS.' });
     }

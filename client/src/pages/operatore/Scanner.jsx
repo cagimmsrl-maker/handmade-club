@@ -80,7 +80,64 @@ export default function Scanner({ sede }) {
       )}
 
       {risultato && <CardEsito risultato={risultato} onNuovaScansione={riprendiScansione} />}
+
+      <CodiceAccesso />
     </div>
+  )
+}
+
+// Il cliente non riesce a rientrare nella tessera (gli chiede di crearla di
+// nuovo e l'SMS non arriva): l'operatore cerca il numero e gli legge il
+// codice, che vale al posto di quello SMS (19/11/2026).
+function CodiceAccesso() {
+  const [aperto, setAperto] = useState(false)
+  const [telefono, setTelefono] = useState('')
+  const [esito, setEsito] = useState(null)
+  const [errore, setErrore] = useState('')
+  const [lavoro, setLavoro] = useState(false)
+
+  async function genera(e) {
+    e.preventDefault()
+    setErrore(''); setEsito(null); setLavoro(true)
+    try {
+      setEsito(await api.post('/operatore/codice-accesso', { telefono }))
+    } catch (err) {
+      setErrore(err.message)
+    }
+    setLavoro(false)
+  }
+
+  if (!aperto) {
+    return (
+      <button className="link-testo" style={{ display: 'block', margin: '18px auto 0' }} onClick={() => setAperto(true)}>
+        Il cliente non riesce a entrare nella tessera?
+      </button>
+    )
+  }
+
+  return (
+    <form className="card" onSubmit={genera} style={{ marginTop: 18 }}>
+      <h2>Codice di accesso</h2>
+      <p className="testo-secondario">
+        Sul suo telefono il cliente tocca <strong>"Ho già la tessera"</strong>, scrive il numero e preme <strong>Invia codice</strong>.
+        Poi tu scrivi qui il suo numero e gli leggi il codice.
+      </p>
+      <div className="campo">
+        <label htmlFor="tel-accesso">Numero del cliente</label>
+        <input id="tel-accesso" type="tel" inputMode="tel" placeholder="333 1234567" value={telefono}
+               onChange={(e) => { setTelefono(e.target.value); setEsito(null) }} required />
+      </div>
+      {errore && <p className="messaggio-errore">{errore}</p>}
+      {esito && (
+        <div style={{ textAlign: 'center', margin: '8px 0 14px' }}>
+          <p style={{ margin: 0 }}>Tessera di <strong>{esito.nome} {esito.cognome}</strong>: controlla che sia lui.</p>
+          <p style={{ fontSize: '2.6rem', fontWeight: 800, letterSpacing: '0.18em', margin: '6px 0' }}>{esito.codice}</p>
+          <p className="testo-secondario" style={{ margin: 0 }}>Vale {esito.validoMinuti} minuti, una volta sola. Se il cliente preme di nuovo "Invia codice", generane un altro.</p>
+        </div>
+      )}
+      <button className="btn btn-primario" type="submit" disabled={lavoro}>{lavoro ? 'Un attimo…' : esito ? 'Genera un altro codice' : 'Genera il codice'}</button>
+      <button type="button" className="link-testo" style={{ display: 'block', margin: '12px auto 0' }} onClick={() => { setAperto(false); setEsito(null); setTelefono(''); setErrore('') }}>Chiudi</button>
+    </form>
   )
 }
 

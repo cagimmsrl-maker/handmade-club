@@ -126,6 +126,14 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
   "Codice di accesso" (`POST /admin/clienti/:id/codice-accesso`, `otpService.codiceDaAdmin`): stessa tabella
   `otp_codes`, valido 15 minuti, una volta; vale l'ultimo creato, quindi va generato DOPO che il cliente ha chiesto
   il codice dall'app. Al primo uso il numero risulta verificato (garantisce l'admin). Nel log solo l'id cliente.
+  **Stesso codice dal banco**: nella schermata `/operatore` (PIN sede) "Il cliente non riesce a entrare nella
+  tessera?" → numero → nome del cliente + codice (`POST /operatore/codice-accesso`, max 10 l'ora per sede, in
+  memoria). Nell'app la schermata del codice dice "Non ti arriva l'SMS? Chiedi il codice alla cassa".
+  `authController.telefonoCanonico`: il numero scritto al login si riporta a quello salvato (ultime 10 cifre, se
+  il cliente è uno solo), così "+39 333…" e "333…" trovano la stessa tessera. `authCliente` confronta
+  `sessioni_valide_da` **al secondo**: al millisecondo respingeva subito chi era appena rientrato col codice.
+  Prova Skebby in alta qualità (`TI`) del 19/11 verso un numero ho.: resta `SENT`, mai consegnato → non è la
+  qualità del canale; per gli SMS serve un altro fornitore (branch `twilio-sms`).
   L'accesso al pannello web Skebby ha una verifica in due passi sul cellulare/email dell'account; in
   emergenza `GET /API/v1.0/REST/dashboard` restituisce un link di accesso diretto (da mandare via SMS al
   titolare, mai nei log).

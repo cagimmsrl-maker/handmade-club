@@ -55,7 +55,7 @@ export default function Onboarding({ onCompletato }) {
       onCompletato()
     } catch (err) {
       if (err.status === 409) {
-        setErrore('Questo numero ha già una tessera: accedi con il codice SMS.')
+        setErrore('Questo numero ha già una tessera: tocca "Ho già la tessera" qui sotto per accedere.')
         setModo(MODO_ACCEDI)
         setStep(null)
       } else {
@@ -183,7 +183,7 @@ export default function Onboarding({ onCompletato }) {
             {caricamento ? 'Creazione in corso...' : 'Crea la mia tessera'}
           </button>
           <button type="button" className="link-testo" style={{ marginTop: 14 }} onClick={() => { setModo(MODO_ACCEDI); setStep(null); setErrore('') }}>
-            Ho già la tessera: accedi con il codice SMS
+            Ho già la tessera: accedi
           </button>
         </form>
       )}
@@ -191,7 +191,7 @@ export default function Onboarding({ onCompletato }) {
       {modo === MODO_ACCEDI && step === null && (
         <form className="card" onSubmit={inviaTelefono}>
           <h2>Accedi alla tua tessera</h2>
-          <p className="testo-secondario">Ti inviamo un codice via SMS al numero con cui ti sei registrato.</p>
+          <p className="testo-secondario">Ti inviamo un codice via SMS al numero con cui ti sei registrato. Se l'SMS non arriva, il codice te lo dà la cassa.</p>
           <div className="campo">
             <label htmlFor="telefono">Numero di telefono</label>
             <input id="telefono" type="tel" placeholder="+39 333 1234567" value={telefono} onChange={(e) => setTelefono(e.target.value)} required autoComplete="tel" />
@@ -210,8 +210,9 @@ export default function Onboarding({ onCompletato }) {
         <form className="card" onSubmit={verificaCodice}>
           <h2>Inserisci il codice</h2>
           <p className="testo-secondario">Abbiamo inviato un codice a 6 cifre a {telefono}.</p>
+          <p className="avviso-codice"><strong>Non ti arriva l'SMS?</strong> Chiedi il codice alla cassa di Handmade Café: te lo danno subito.</p>
           <div className="campo">
-            <label htmlFor="codice">Codice SMS</label>
+            <label htmlFor="codice">Codice</label>
             <input id="codice" type="text" inputMode="numeric" maxLength={6} placeholder="123456" value={codice} onChange={(e) => setCodice(e.target.value.replace(/\D/g, ''))} required autoComplete="one-time-code" />
           </div>
           {errore && <p className="messaggio-errore">{errore}</p>}

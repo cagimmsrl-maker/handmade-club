@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const otpService = require('../services/otpService');
 const jwtService = require('../services/jwtService');
 const livelloService = require('../services/livelloService');
 const cassaService = require('../services/cassaService');
@@ -164,4 +165,41 @@ async function usaPromozione(req, res, next) {
   }
 }
 
-module.exports = { elencoSedi, login, logout, scansione, sessione, usaPromozione };
+// Codice di accesso dal banco (19/11/2026): il cliente ha perso la sessione
+// (telefono nuovo, app reinstallata, tessera non aperta da un mese) e l'SMS
+// non gli arriva. L'operatore, già dentro con il PIN della sede, cerca il
+// numero e legge al cliente il codice, che vale come quello SMS. Mostriamo il
+// nome perché l'operatore controlli di avere davanti la persona giusta.
+// Freno agli abusi: al massimo 10 codici l'ora per sede (in memoria: un
+// riavvio azzera il conto, ma il codice dura comunque 15 minuti).
+const codiciPerSede = new Map();
+const MAX_CODICI_ORA = 10;
+async function codiceAccesso(req, res, next) {
+  try {
+    const ora = Date.now();
+    const recenti = (codiciPerSede.get(req.sedeId) || []).filter((t) => ora - t < 60 * 60 * 1000);
+    if (recenti.length >= MAX_CODICI_ORA) {
+      return res.status(429).json({ errore: 'Troppi codici generati in un\'ora da questa sede. Riprova più tardi o chiedi al titolare.' });
+    }
+    const cifre = req.body.telefono.replace(/\D/g, '');
+    const { rows } = await pool.query(
+      `SELECT c.id, c.nome, c.cognome, c.telefono
+       FROM clienti c JOIN tessere t ON t.cliente_id = c.id AND t.stato = 'attiva'
+       WHERE c.stato = 'attivo' AND right(regexp_replace(c.telefono, '\\D', '', 'g'), 10) = $1
+       LIMIT 2`,
+      [cifre.slice(-10)]
+    );
+    if (rows.length === 0) return res.status(404).json({ errore: 'Nessuna tessera attiva con questo numero. Controlla il numero: se è giusto, il cliente può creare la tessera.' });
+    if (rows.length > 1) return res.status(409).json({ errore: 'Più tessere con questo numero: serve il titolare dal pannello admin.' });
+    const cliente = rows[0];
+    const esito = await otpService.codiceDaAdmin(cliente.telefono);
+    recenti.push(ora);
+    codiciPerSede.set(req.sedeId, recenti);
+    console.log(`[accesso] codice di accesso generato dal banco (sede ${req.sedeId}) per il cliente ${cliente.id}`);
+    res.json({ nome: cliente.nome, cognome: cliente.cognome || '', ...esito });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { elencoSedi, login, logout, scansione, sessione, usaPromozione, codiceAccesso };

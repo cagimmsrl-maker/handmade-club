@@ -17,4 +17,8 @@ const usaPromozioneSchema = z.object({
   codice: z.string().trim().min(1).max(500),
 });
 
-module.exports = { loginSchema, scansioneSchema, usaPromozioneSchema };
+const codiceAccessoSchema = z.object({
+  telefono: z.string().trim().min(6).max(25).regex(/^[+\d\s-]+$/, 'Numero non valido'),
+});
+
+module.exports = { loginSchema, scansioneSchema, usaPromozioneSchema, codiceAccessoSchema };
