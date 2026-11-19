@@ -17,39 +17,23 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Prova SMS Skebby in Alta qualita (TI) verso il numero del titolare
+      - name: Stato di consegna della prova SMS (sola lettura)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set -e
           cd /var/www/handmade-club/server
-          cat > /tmp/prova-ti.js <<'JS'
+          cat > ./_stato.js <<'JS'
           require('dotenv').config();
           const B = 'https://api.skebby.it/API/v1.0/REST';
-          const NUM = '393356483122';
-          const maschera = (n) => n.slice(0, 5) + '...' + n.slice(-3);
           (async () => {
             const l = await fetch(`${B}/login?username=${encodeURIComponent(process.env.SKEBBY_USER)}&password=${encodeURIComponent(process.env.SKEBBY_PASSWORD)}`);
-            if (!l.ok) { console.log('login HTTP', l.status); return; }
             const [user_key, Session_key] = (await l.text()).trim().split(';');
-            const h = { 'Content-Type': 'application/json', user_key, Session_key };
-            const st = await (await fetch(`${B}/status`, { headers: h })).json().catch(() => ({}));
-            console.log('CREDITO euro:', st.money, '| SMS per tipo:', JSON.stringify((st.sms || []).map((s) => ({ tipo: s.type, quanti: s.quantity }))));
-            for (const tipo of ['TI']) {
-              const r = await fetch(`${B}/sms`, { method: 'POST', headers: h, body: JSON.stringify({ message_type: tipo, message: 'Handmade Club: prova di consegna SMS in alta qualita. Se la leggi, funziona.', recipient: [NUM], returnCredits: true }) });
-              const d = await r.json().catch(() => ({}));
-              console.log(`INVIO ${tipo} a ${maschera(NUM)}: HTTP ${r.status} result=${d.result} order=${d.order_id} sms=${d.total_sent} credito_residuo=${d.remaining_credits}`);
-              if (d.result !== 'OK') { console.log('dettaglio:', JSON.stringify(d).slice(0, 300)); continue; }
-              for (let i = 0; i < 9; i++) {
-                await new Promise((r2) => setTimeout(r2, 10000));
-                const s = await (await fetch(`${B}/sms/${d.order_id}`, { headers: h })).json().catch(() => ({}));
-                const stato = (s.recipients || []).map((x) => x.status).join(',');
-                console.log(`  dopo ${(i + 1) * 10}s: ${stato || JSON.stringify(s).slice(0, 120)}`);
-                if (/DLVRD|ERROR|TIMEOUT|FAILED|KO/.test(stato)) break;
-              }
-            }
+            const h = { user_key, Session_key };
+            const s = await (await fetch(`${B}/sms/E0FB752688054053850EA1FE471B714A`, { headers: h })).json().catch(() => ({}));
+            console.log('PROVA TI:', (s.recipients || []).map((x) => `${x.status} consegna=${x.delivery_date || '-'}`).join(' | ') || JSON.stringify(s).slice(0, 200));
           })().catch((e) => console.log('ERRORE', e.message));
           JS
-          cp /tmp/prova-ti.js ./_prova-ti.js && node ./_prova-ti.js; rm -f ./_prova-ti.js /tmp/prova-ti.js
+          node ./_stato.js; rm -f ./_stato.js
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -s' < /tmp/cmd.sh
