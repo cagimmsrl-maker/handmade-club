@@ -58,7 +58,10 @@ processo PM2 separato, sottodominio separato. Non toccare mai il database o i fi
      le reti mobili usano CGNAT — il limite per IP ferma solo gli abusi automatici). Il tetto vero per
      gli OTP è **per numero** (otpService: max richieste per numero, 3 tentativi per codice).
    - OTP a 6 cifre, validità 5 minuti, monouso, max 3 tentativi di verifica
-   - Sessioni con JWT httpOnly + secure, scadenza 30 giorni (i clienti non devono riloggarsi ogni volta)
+   - Sessioni con JWT httpOnly + secure, scadenza 30 giorni (i clienti non devono riloggarsi ogni volta).
+     **Rinnovo automatico (19/11/2026):** `authCliente` riemette il cookie (altri 30 giorni) se il token ha più di
+     un giorno e il cliente è attivo: scade solo chi non apre l'app per 30 giorni. Prima scadeva 30 giorni dopo la
+     registrazione anche per chi la usava ogni giorno (scoperto quando le tessere di staff del 18-20/10 sono scadute).
    - Input validation su ogni endpoint (mai fidarsi del client)
    - Nessun dato sensibile nei log
 5. **Ruoli separati.** Tre superfici distinte:
