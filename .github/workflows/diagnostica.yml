@@ -17,20 +17,41 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Accende il codice di rinnovo (modifica .env con copia di sicurezza)
+      - name: Tessere e notifiche di oggi (sola lettura)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set -e
-          cd /var/www/handmade-club/server
-          cp -p .env ".env.bak_$(date +%F_%H%M%S)"
-          sed -i '/^CODICE_RINNOVO=/d;/^CODICE_RINNOVO_FINO_AL=/d' .env
-          printf '\nCODICE_RINNOVO=147852\nCODICE_RINNOVO_FINO_AL=2026-12-31\n' >> .env
-          echo "righe CODICE_RINNOVO nel .env: $(grep -c '^CODICE_RINNOVO' .env)"
-          pm2 restart handmade-club --update-env >/dev/null
-          sleep 3
-          echo "salute: $(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3002/api/salute)"
-          echo "codice sbagliato su numero inesistente -> $(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:3002/api/auth/verifica-otp -H 'Content-Type: application/json' -d '{"telefono":"3000000000","codice":"000000"}')"
-          pm2 logs handmade-club --lines 15 --nostream 2>/dev/null | grep -iE "error|ascolto" | tail -3 | sed -E 's/[0-9]{6,}/######/g'
+          sudo -u postgres psql -d handmade_clienti -At -F ' | ' <<'SQL'
+          \echo === ORA ===
+          SELECT to_char(now() AT TIME ZONE 'Europe/Rome','DD/MM HH24:MI');
+          \echo === TESSERE NUOVE OGGI PER ORA ===
+          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','HH24'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-20 00:00+01' GROUP BY 1 ORDER BY 1;
+          \echo === TESSERE NUOVE ULTIMI GIORNI ===
+          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','DD/MM'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-13 00:00+01' GROUP BY 1 ORDER BY 1;
+          \echo === TOTALE ATTIVE | CON CONSENSO MARKETING ===
+          SELECT COUNT(*), COUNT(*) FILTER (WHERE consenso_marketing_il IS NOT NULL AND consenso_marketing_revocato_il IS NULL) FROM clienti WHERE stato='attivo';
+          \echo === NOTIFICHE ATTIVATE OGGI: TESSERA NUOVA (di oggi) / VECCHIA ===
+          SELECT CASE WHEN c.created_at >= '2026-11-20 00:00+01' THEN 'nuova' ELSE 'vecchia' END, COUNT(*) FROM push_iscrizioni p JOIN clienti c ON c.id=p.cliente_id WHERE p.created_at >= '2026-11-20 00:00+01' GROUP BY 1;
+          \echo === TESSERE DI OGGI CON NOTIFICHE / TOTALE ===
+          SELECT COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM push_iscrizioni p WHERE p.cliente_id=c.id)), COUNT(*) FROM clienti c WHERE c.created_at >= '2026-11-20 00:00+01';
+          \echo === TELEFONI ISCRITTI TOTALI | CLIENTI | RAGGIUNGIBILI (con consenso) ===
+          SELECT COUNT(*), COUNT(DISTINCT p.cliente_id), COUNT(DISTINCT p.cliente_id) FILTER (WHERE c.stato='attivo' AND c.consenso_marketing_il IS NOT NULL AND c.consenso_marketing_revocato_il IS NULL) FROM push_iscrizioni p JOIN clienti c ON c.id=p.cliente_id;
+          \echo === CONSENSI MARKETING DATI OGGI ===
+          SELECT COUNT(*) FROM clienti WHERE consenso_marketing_il >= '2026-11-20 00:00+01';
+          \echo === CANALE TESSERE DI OGGI ===
+          SELECT COALESCE(origine,'banco'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-20 00:00+01' GROUP BY 1;
+          \echo === PASSAGGI REGISTRATI OGGI (scansioni) ===
+          SELECT COUNT(*) FROM scansioni WHERE created_at >= '2026-11-20 00:00+01';
+          \echo === TGS: SINCRONIZZATE PER ESITO | IN ATTESA ===
+          SELECT stato, COUNT(*) FROM tgs_sincronizzazioni GROUP BY 1;
+          SELECT 'in attesa', COUNT(*) FROM clienti c JOIN tessere t ON t.cliente_id=c.id AND t.stato='attiva' WHERE c.stato='attivo' AND NOT EXISTS (SELECT 1 FROM tgs_sincronizzazioni s WHERE s.cliente_id=c.id);
+          SELECT 'ultima chiamata TGS', to_char(MAX(ultimo_uso_il) AT TIME ZONE 'Europe/Rome','HH24:MI:SS') FROM tgs_chiavi_api WHERE attiva;
+          SQL
+          L=$(ls /var/log/nginx/*club*access*.log 2>/dev/null | head -1); [ -z "$L" ] && L=/var/log/nginx/access.log
+          echo "=== RIENTRI DI OGGI: verifica-otp per esito (200 = entrato) ==="
+          grep '20/Nov/2026' $L | grep 'POST /api/auth/verifica-otp' | awk '{print $9}' | sort | uniq -c
+          echo "=== RIENTRI COL CODICE DI RINNOVO (dal log, dal riavvio) ==="
+          pm2 logs handmade-club --lines 5000 --nostream 2>/dev/null | grep -c "\[rinnovo\]" || true
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -s' < /tmp/cmd.sh
