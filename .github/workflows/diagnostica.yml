@@ -25,23 +25,23 @@ jobs:
           \echo === ORA ===
           SELECT to_char(now() AT TIME ZONE 'Europe/Rome','DD/MM HH24:MI');
           \echo === TESSERE NUOVE OGGI PER ORA ===
-          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','HH24'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-20 00:00+01' GROUP BY 1 ORDER BY 1;
+          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','HH24'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-21 00:00+01' GROUP BY 1 ORDER BY 1;
           \echo === TESSERE NUOVE ULTIMI GIORNI ===
-          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','DD/MM'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-13 00:00+01' GROUP BY 1 ORDER BY 1;
+          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','DD/MM'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-14 00:00+01' GROUP BY 1 ORDER BY 1;
           \echo === TOTALE ATTIVE | CON CONSENSO MARKETING ===
           SELECT COUNT(*), COUNT(*) FILTER (WHERE consenso_marketing_il IS NOT NULL AND consenso_marketing_revocato_il IS NULL) FROM clienti WHERE stato='attivo';
           \echo === NOTIFICHE ATTIVATE OGGI: TESSERA NUOVA (di oggi) / VECCHIA ===
-          SELECT CASE WHEN c.created_at >= '2026-11-20 00:00+01' THEN 'nuova' ELSE 'vecchia' END, COUNT(*) FROM push_iscrizioni p JOIN clienti c ON c.id=p.cliente_id WHERE p.created_at >= '2026-11-20 00:00+01' GROUP BY 1;
+          SELECT CASE WHEN c.created_at >= '2026-11-21 00:00+01' THEN 'nuova' ELSE 'vecchia' END, COUNT(*) FROM push_iscrizioni p JOIN clienti c ON c.id=p.cliente_id WHERE p.created_at >= '2026-11-21 00:00+01' GROUP BY 1;
           \echo === TESSERE DI OGGI CON NOTIFICHE / TOTALE ===
-          SELECT COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM push_iscrizioni p WHERE p.cliente_id=c.id)), COUNT(*) FROM clienti c WHERE c.created_at >= '2026-11-20 00:00+01';
+          SELECT COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM push_iscrizioni p WHERE p.cliente_id=c.id)), COUNT(*) FROM clienti c WHERE c.created_at >= '2026-11-21 00:00+01';
           \echo === TELEFONI ISCRITTI TOTALI | CLIENTI | RAGGIUNGIBILI (con consenso) ===
           SELECT COUNT(*), COUNT(DISTINCT p.cliente_id), COUNT(DISTINCT p.cliente_id) FILTER (WHERE c.stato='attivo' AND c.consenso_marketing_il IS NOT NULL AND c.consenso_marketing_revocato_il IS NULL) FROM push_iscrizioni p JOIN clienti c ON c.id=p.cliente_id;
           \echo === CONSENSI MARKETING DATI OGGI ===
-          SELECT COUNT(*) FROM clienti WHERE consenso_marketing_il >= '2026-11-20 00:00+01';
+          SELECT COUNT(*) FROM clienti WHERE consenso_marketing_il >= '2026-11-21 00:00+01';
           \echo === CANALE TESSERE DI OGGI ===
-          SELECT COALESCE(origine,'banco'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-20 00:00+01' GROUP BY 1;
+          SELECT COALESCE(origine,'banco'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-21 00:00+01' GROUP BY 1;
           \echo === PASSAGGI REGISTRATI OGGI (scansioni) ===
-          SELECT COUNT(*) FROM scansioni WHERE created_at >= '2026-11-20 00:00+01';
+          SELECT COUNT(*) FROM scansioni WHERE created_at >= '2026-11-21 00:00+01';
           \echo === TGS: SINCRONIZZATE PER ESITO | IN ATTESA ===
           SELECT stato, COUNT(*) FROM tgs_sincronizzazioni GROUP BY 1;
           SELECT 'in attesa', COUNT(*) FROM clienti c JOIN tessere t ON t.cliente_id=c.id AND t.stato='attiva' WHERE c.stato='attivo' AND NOT EXISTS (SELECT 1 FROM tgs_sincronizzazioni s WHERE s.cliente_id=c.id);
@@ -49,7 +49,7 @@ jobs:
           SQL
           L=$(ls /var/log/nginx/*club*access*.log 2>/dev/null | head -1); [ -z "$L" ] && L=/var/log/nginx/access.log
           echo "=== RIENTRI DI OGGI: verifica-otp per esito (200 = entrato) ==="
-          grep '20/Nov/2026' $L | grep 'POST /api/auth/verifica-otp' | awk '{print $9}' | sort | uniq -c
+          grep '21/Nov/2026' $L | grep 'POST /api/auth/verifica-otp' | awk '{print $9}' | sort | uniq -c
           echo "=== RIENTRI COL CODICE DI RINNOVO (dal log, dal riavvio) ==="
           pm2 logs handmade-club --lines 5000 --nostream 2>/dev/null | grep -c "\[rinnovo\]" || true
           SCRIPT
