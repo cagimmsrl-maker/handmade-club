@@ -17,22 +17,53 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Sconti - convenzioni, livelli e promo (sola lettura, nessun dato personale)
+      - name: Tessere e notifiche di oggi (sola lettura)
         run: |
           cat > /tmp/cmd.sh <<'SCRIPT'
           set -e
           sudo -u postgres psql -d handmade_clienti -At -F ' | ' <<'SQL'
-          \echo === LIVELLI: nome | soglia | sconto | attivo ===
-          SELECT nome, soglia_visite, sconto_percentuale, attivo FROM livelli ORDER BY ordine;
-          \echo === CONVENZIONI: id | nome | sconto | attiva | clienti attivi ===
-          SELECT v.id, v.nome, v.sconto_percentuale, v.attiva, (SELECT COUNT(*) FROM clienti c WHERE c.convenzione_id=v.id AND c.stato='attivo') FROM convenzioni v ORDER BY v.id;
-          \echo === PROMO: id | titolo | tipo | valore | stato | dal | al | automatica | codice_tgs | usi/cliente | caricate ===
-          SELECT p.id, p.titolo, p.tipo, p.valore, p.stato, p.valido_dal, p.valido_al, p.automatica, COALESCE(p.codice_tgs,'-'), COALESCE(p.usi_per_cliente::text,'illimitati'), (SELECT COUNT(*) FROM promozioni_clienti pc WHERE pc.promozione_id=p.id) FROM promozioni p ORDER BY p.id;
-          \echo === CLIENTI CON CONVENZIONE CHE HANNO ANCHE UNA PROMO SCONTO CARICATA: convenzione | promo | clienti ===
-          SELECT v.nome, p.titolo, COUNT(*) FROM clienti c JOIN convenzioni v ON v.id=c.convenzione_id JOIN promozioni_clienti pc ON pc.cliente_id=c.id JOIN promozioni p ON p.id=pc.promozione_id AND p.stato='pubblicata' AND p.valido_al >= current_date WHERE c.stato='attivo' GROUP BY 1,2;
-          \echo === PROMO MANDATE ALLA CASSA TGS: promo | esito | n ===
-          SELECT p.titolo, s.stato, COUNT(*) FROM tgs_sinc_promozioni s JOIN promozioni_clienti pc ON pc.id=s.promozione_cliente_id JOIN promozioni p ON p.id=pc.promozione_id GROUP BY 1,2;
+          \echo === ORA ===
+          SELECT to_char(now() AT TIME ZONE 'Europe/Rome','DD/MM HH24:MI');
+          \echo === TESSERE NUOVE OGGI PER ORA ===
+          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','HH24'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-25 00:00+01' GROUP BY 1 ORDER BY 1;
+          \echo === TESSERE NUOVE ULTIMI GIORNI ===
+          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','DD/MM'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-18 00:00+01' GROUP BY 1 ORDER BY 1;
+          \echo === NOTIFICHE ATTIVATE PER GIORNO ===
+          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','DD/MM'), COUNT(*) FROM push_iscrizioni WHERE created_at >= '2026-11-18 00:00+01' GROUP BY 1 ORDER BY 1;
+          \echo === TESSERE DI IERI PER ORA ===
+          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','HH24'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-24 00:00+01' AND created_at < '2026-11-25 00:00+01' GROUP BY 1 ORDER BY 1;
+          \echo === CANALE TESSERE DAL 22/11 ===
+          SELECT COALESCE(origine,'banco'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-22 00:00+01' GROUP BY 1;
+          \echo === LUNEDI 23/11 PER ORA ===
+          SELECT to_char(created_at AT TIME ZONE 'Europe/Rome','HH24:MI'), COALESCE(origine,'banco') FROM clienti WHERE created_at >= '2026-11-23 00:00+01' AND created_at < '2026-11-24 00:00+01' ORDER BY 1;
+          \echo === TUTTI I LUNEDI: data | tessere ===
+          SELECT to_char(d,'DD/MM'), (SELECT COUNT(*) FROM clienti c WHERE (c.created_at AT TIME ZONE 'Europe/Rome')::date = d::date) FROM generate_series('2026-11-02'::date,'2026-11-23'::date,'7 days') d;
+          \echo === PER GIORNO DELLA SETTIMANA dal 29/10 (1=lun..7=dom): giorno | tessere | giorni ===
+          SELECT extract(isodow FROM (created_at AT TIME ZONE 'Europe/Rome'))::int, COUNT(*), COUNT(DISTINCT (created_at AT TIME ZONE 'Europe/Rome')::date) FROM clienti WHERE created_at >= '2026-10-29 00:00+01' AND created_at < '2026-11-25 00:00+01' GROUP BY 1 ORDER BY 1;
+          \echo === TOTALE ATTIVE | CON CONSENSO MARKETING ===
+          SELECT COUNT(*), COUNT(*) FILTER (WHERE consenso_marketing_il IS NOT NULL AND consenso_marketing_revocato_il IS NULL) FROM clienti WHERE stato='attivo';
+          \echo === NOTIFICHE ATTIVATE OGGI: TESSERA NUOVA (di oggi) / VECCHIA ===
+          SELECT CASE WHEN c.created_at >= '2026-11-25 00:00+01' THEN 'nuova' ELSE 'vecchia' END, COUNT(*) FROM push_iscrizioni p JOIN clienti c ON c.id=p.cliente_id WHERE p.created_at >= '2026-11-25 00:00+01' GROUP BY 1;
+          \echo === TESSERE DI OGGI CON NOTIFICHE / TOTALE ===
+          SELECT COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM push_iscrizioni p WHERE p.cliente_id=c.id)), COUNT(*) FROM clienti c WHERE c.created_at >= '2026-11-25 00:00+01';
+          \echo === TELEFONI ISCRITTI TOTALI | CLIENTI | RAGGIUNGIBILI (con consenso) ===
+          SELECT COUNT(*), COUNT(DISTINCT p.cliente_id), COUNT(DISTINCT p.cliente_id) FILTER (WHERE c.stato='attivo' AND c.consenso_marketing_il IS NOT NULL AND c.consenso_marketing_revocato_il IS NULL) FROM push_iscrizioni p JOIN clienti c ON c.id=p.cliente_id;
+          \echo === CONSENSI MARKETING DATI OGGI ===
+          SELECT COUNT(*) FROM clienti WHERE consenso_marketing_il >= '2026-11-25 00:00+01';
+          \echo === CANALE TESSERE DI OGGI ===
+          SELECT COALESCE(origine,'banco'), COUNT(*) FROM clienti WHERE created_at >= '2026-11-25 00:00+01' GROUP BY 1;
+          \echo === PASSAGGI REGISTRATI OGGI (scansioni) ===
+          SELECT COUNT(*) FROM scansioni WHERE created_at >= '2026-11-25 00:00+01';
+          \echo === TGS: SINCRONIZZATE PER ESITO | IN ATTESA ===
+          SELECT stato, COUNT(*) FROM tgs_sincronizzazioni GROUP BY 1;
+          SELECT 'in attesa', COUNT(*) FROM clienti c JOIN tessere t ON t.cliente_id=c.id AND t.stato='attiva' WHERE c.stato='attivo' AND NOT EXISTS (SELECT 1 FROM tgs_sincronizzazioni s WHERE s.cliente_id=c.id);
+          SELECT 'ultima chiamata TGS', to_char(MAX(ultimo_uso_il) AT TIME ZONE 'Europe/Rome','HH24:MI:SS') FROM tgs_chiavi_api WHERE attiva;
           SQL
+          L=$(ls /var/log/nginx/*club*access*.log 2>/dev/null | head -1); [ -z "$L" ] && L=/var/log/nginx/access.log
+          echo "=== RIENTRI DI OGGI: verifica-otp per esito (200 = entrato) ==="
+          grep '25/Nov/2026' $L | grep 'POST /api/auth/verifica-otp' | awk '{print $9}' | sort | uniq -c
+          echo "=== RIENTRI COL CODICE DI RINNOVO (dal log, dal riavvio) ==="
+          pm2 logs handmade-club --lines 5000 --nostream 2>/dev/null | grep -c "\[rinnovo\]" || true
           SCRIPT
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -s' < /tmp/cmd.sh
